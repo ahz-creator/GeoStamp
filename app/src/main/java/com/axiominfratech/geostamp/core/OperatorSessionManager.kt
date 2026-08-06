@@ -3,9 +3,17 @@ package com.axiominfratech.geostamp.core
 import android.content.Context
 import com.axiominfratech.geostamp.config.RemoteConfigManager
 import org.json.JSONArray
+import org.json.JSONObject
 import java.util.UUID
 
-/** Stores one active operator clock-in session locally for offline use. */
+/**
+ * Stores one active operator session locally for offline use.
+ *
+ * The session belongs to the operator, not to one site. As the user moves, the
+ * nearest valid site may change while the same operator session remains active.
+ * The session expires only after the configured inactivity period or manual
+ * clock-out.
+ */
 class OperatorSessionManager(context: Context) {
     private val prefs = context.getSharedPreferences("geostamp_prefs", Context.MODE_PRIVATE)
 
@@ -16,29 +24,53 @@ class OperatorSessionManager(context: Context) {
         val operatorCode: String,
         val aliases: List<String>,
         val startedAt: Long,
+        val lastActivityAt: Long,
+        val inactivityTimeoutMinutes: Int,
         val photoCount: Int,
-        val siteIds: Set<String>
-    )
+        val siteIds: Set<String>,
+        val sitePhotoCounts: Map<String, Int>
+    ) {
+        fun isExpired(now: Long = System.currentTimeMillis()): Boolean =
+            now - lastActivityAt >= inactivityTimeoutMinutes * 60_000L
 
-    fun active(): Session? {
+        fun photosAtSite(siteId: String): Int = sitePhotoCounts[siteId.trim()] ?: 0
+    }
+
+    fun active(now: Long = System.currentTimeMillis()): Session? {
         val id = prefs.getString(KEY_ID, null) ?: return null
         val operatorId = prefs.getString(KEY_OPERATOR_ID, null) ?: return null
         val operatorName = prefs.getString(KEY_OPERATOR_NAME, null) ?: return null
         val aliases = jsonArrayToList(prefs.getString(KEY_ALIASES, "[]") ?: "[]")
         val sites = jsonArrayToList(prefs.getString(KEY_SITES, "[]") ?: "[]").toSet()
-        return Session(
+        val startedAt = prefs.getLong(KEY_STARTED, 0L)
+        val session = Session(
             id = id,
             operatorId = operatorId,
             operatorName = operatorName,
             operatorCode = prefs.getString(KEY_OPERATOR_CODE, "OP") ?: "OP",
             aliases = aliases,
-            startedAt = prefs.getLong(KEY_STARTED, 0L),
+            startedAt = startedAt,
+            lastActivityAt = prefs.getLong(KEY_LAST_ACTIVITY, startedAt),
+            inactivityTimeoutMinutes = prefs.getInt(KEY_TIMEOUT_MINUTES, DEFAULT_INACTIVITY_MINUTES)
+                .coerceIn(1, 24 * 60),
             photoCount = prefs.getInt(KEY_PHOTOS, 0),
-            siteIds = sites
+            siteIds = sites,
+            sitePhotoCounts = jsonObjectToIntMap(
+                prefs.getString(KEY_SITE_PHOTO_COUNTS, "{}") ?: "{}"
+            )
         )
+
+        if (session.isExpired(now)) {
+            end(CLOCK_OUT_INACTIVITY, now)
+            return null
+        }
+        return session
     }
 
-    fun start(operator: RemoteConfigManager.OperatorConfig): Session {
+    fun start(
+        operator: RemoteConfigManager.OperatorConfig,
+        inactivityTimeoutMinutes: Int = DEFAULT_INACTIVITY_MINUTES
+    ): Session {
         active()?.let { current ->
             if (current.operatorId == operator.id) return current
             error("Clock out from ${current.operatorName} first")
@@ -52,36 +84,89 @@ class OperatorSessionManager(context: Context) {
             .putString(KEY_OPERATOR_CODE, operator.code)
             .putString(KEY_ALIASES, JSONArray(operator.aliases).toString())
             .putLong(KEY_STARTED, now)
+            .putLong(KEY_LAST_ACTIVITY, now)
+            .putInt(KEY_TIMEOUT_MINUTES, inactivityTimeoutMinutes.coerceIn(1, 24 * 60))
             .putInt(KEY_PHOTOS, 0)
             .putString(KEY_SITES, "[]")
+            .putString(KEY_SITE_PHOTO_COUNTS, "{}")
+            .remove(KEY_LAST_CLOCK_OUT_REASON)
+            .remove(KEY_LAST_CLOCK_OUT_AT)
             .apply()
         return active() ?: error("Unable to create operator session")
     }
 
-    fun end(): Session? {
-        val current = active()
+    /** Manual clock-out. */
+    fun end(): Session? = end(CLOCK_OUT_MANUAL)
+
+    fun end(reason: String, endedAt: Long = System.currentTimeMillis()): Session? {
+        val current = readWithoutExpiry()
         prefs.edit()
+            .putString(KEY_LAST_CLOCK_OUT_REASON, reason)
+            .putLong(KEY_LAST_CLOCK_OUT_AT, endedAt)
             .remove(KEY_ID)
             .remove(KEY_OPERATOR_ID)
             .remove(KEY_OPERATOR_NAME)
             .remove(KEY_OPERATOR_CODE)
             .remove(KEY_ALIASES)
             .remove(KEY_STARTED)
+            .remove(KEY_LAST_ACTIVITY)
+            .remove(KEY_TIMEOUT_MINUTES)
             .remove(KEY_PHOTOS)
             .remove(KEY_SITES)
+            .remove(KEY_SITE_PHOTO_COUNTS)
             .apply()
         return current
     }
 
+    /**
+     * Records a successful capture and resets the four-hour inactivity timer.
+     * The operator remains unchanged; each site receives its own count/folder.
+     */
     fun recordCapture(siteId: String?) {
         val current = active() ?: return
-        val sites = current.siteIds.toMutableSet().apply {
-            siteId?.trim()?.takeIf { it.isNotEmpty() && it != "–" }?.let(::add)
+        val cleanSite = siteId?.trim()?.takeIf { it.isNotEmpty() && it != "–" }
+        val sites = current.siteIds.toMutableSet()
+        val counts = current.sitePhotoCounts.toMutableMap()
+        if (cleanSite != null) {
+            sites += cleanSite
+            counts[cleanSite] = (counts[cleanSite] ?: 0) + 1
         }
         prefs.edit()
             .putInt(KEY_PHOTOS, current.photoCount + 1)
+            .putLong(KEY_LAST_ACTIVITY, System.currentTimeMillis())
             .putString(KEY_SITES, JSONArray(sites.toList()).toString())
+            .putString(KEY_SITE_PHOTO_COUNTS, JSONObject(counts).toString())
             .apply()
+    }
+
+    /** Any meaningful operator action may refresh inactivity without adding a photo. */
+    fun touchActivity(now: Long = System.currentTimeMillis()) {
+        if (readWithoutExpiry() != null) prefs.edit().putLong(KEY_LAST_ACTIVITY, now).apply()
+    }
+
+    fun lastClockOutReason(): String? = prefs.getString(KEY_LAST_CLOCK_OUT_REASON, null)
+    fun lastClockOutAt(): Long = prefs.getLong(KEY_LAST_CLOCK_OUT_AT, 0L)
+
+    private fun readWithoutExpiry(): Session? {
+        val id = prefs.getString(KEY_ID, null) ?: return null
+        val operatorId = prefs.getString(KEY_OPERATOR_ID, null) ?: return null
+        val operatorName = prefs.getString(KEY_OPERATOR_NAME, null) ?: return null
+        val startedAt = prefs.getLong(KEY_STARTED, 0L)
+        return Session(
+            id = id,
+            operatorId = operatorId,
+            operatorName = operatorName,
+            operatorCode = prefs.getString(KEY_OPERATOR_CODE, "OP") ?: "OP",
+            aliases = jsonArrayToList(prefs.getString(KEY_ALIASES, "[]") ?: "[]"),
+            startedAt = startedAt,
+            lastActivityAt = prefs.getLong(KEY_LAST_ACTIVITY, startedAt),
+            inactivityTimeoutMinutes = prefs.getInt(KEY_TIMEOUT_MINUTES, DEFAULT_INACTIVITY_MINUTES),
+            photoCount = prefs.getInt(KEY_PHOTOS, 0),
+            siteIds = jsonArrayToList(prefs.getString(KEY_SITES, "[]") ?: "[]").toSet(),
+            sitePhotoCounts = jsonObjectToIntMap(
+                prefs.getString(KEY_SITE_PHOTO_COUNTS, "{}") ?: "{}"
+            )
+        )
     }
 
     private fun jsonArrayToList(raw: String): List<String> = runCatching {
@@ -89,14 +174,34 @@ class OperatorSessionManager(context: Context) {
         buildList { for (i in 0 until array.length()) array.optString(i).takeIf { it.isNotBlank() }?.let(::add) }
     }.getOrDefault(emptyList())
 
+    private fun jsonObjectToIntMap(raw: String): Map<String, Int> = runCatching {
+        val obj = JSONObject(raw)
+        buildMap {
+            val keys = obj.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                put(key, obj.optInt(key, 0))
+            }
+        }
+    }.getOrDefault(emptyMap())
+
     companion object {
+        const val DEFAULT_INACTIVITY_MINUTES = 240
+        const val CLOCK_OUT_MANUAL = "Manual clock-out"
+        const val CLOCK_OUT_INACTIVITY = "Four-hour inactivity timeout"
+
         private const val KEY_ID = "operator_session_id"
         private const val KEY_OPERATOR_ID = "operator_session_operator_id"
         private const val KEY_OPERATOR_NAME = "operator_session_operator_name"
         private const val KEY_OPERATOR_CODE = "operator_session_operator_code"
         private const val KEY_ALIASES = "operator_session_aliases"
         private const val KEY_STARTED = "operator_session_started_at"
+        private const val KEY_LAST_ACTIVITY = "operator_session_last_activity_at"
+        private const val KEY_TIMEOUT_MINUTES = "operator_session_inactivity_timeout_minutes"
         private const val KEY_PHOTOS = "operator_session_photo_count"
         private const val KEY_SITES = "operator_session_site_ids"
+        private const val KEY_SITE_PHOTO_COUNTS = "operator_session_site_photo_counts"
+        private const val KEY_LAST_CLOCK_OUT_REASON = "operator_last_clock_out_reason"
+        private const val KEY_LAST_CLOCK_OUT_AT = "operator_last_clock_out_at"
     }
 }

@@ -6,12 +6,7 @@ import org.json.JSONObject
 import java.io.File
 import java.net.URLEncoder
 
-/**
- * Public-safe local registry queue.
- *
- * No GitHub token or private identity data is stored here. Records can be opened
- * in GeoStamp Admin, reviewed, and then published using the admin's GitHub token.
- */
+/** Public-safe local registry queue. */
 object EvidenceRegistryOutbox {
 
     private const val ADMIN_URL = "https://ahz-creator.github.io/GeoStamp-Admin/"
@@ -33,9 +28,9 @@ object EvidenceRegistryOutbox {
         require(evidenceId.isNotBlank()) { "Evidence ID is required" }
 
         val publicRecord = JSONObject().apply {
-            put("schemaVersion", 1)
+            put("schemaVersion", 2)
             put("evidenceId", evidenceId)
-            put("verificationId", evidenceId) // compatibility alias; same permanent ID
+            put("verificationId", evidenceId)
             put("registryStatus", "PUBLIC_RECORD")
             put("evidenceStatus", fullMetadata.optString("evidenceStatus", "REGISTERED"))
             put("capturedAt", fullMetadata.optLong("timestamp", System.currentTimeMillis()))
@@ -59,6 +54,28 @@ object EvidenceRegistryOutbox {
             put("captureSignatureAlgorithm", fullMetadata.optString("captureSignatureAlgorithm"))
             put("captureSignedPayload", fullMetadata.optString("captureSignedPayload"))
             put("markerVersion", fullMetadata.optInt("markerVersion", 1))
+
+            // Compact mobile slip fields. These are public-safe, compressed values.
+            copyIfPresent(fullMetadata, this, "thumbnailBase64")
+            copyIfPresent(fullMetadata, this, "thumbnailJpegBase64")
+            copyIfPresent(fullMetadata, this, "operatorSessionId")
+            copyIfPresent(fullMetadata, this, "operatorSessionStartedAt")
+            copyIfPresent(fullMetadata, this, "operatorSessionLastActivityAt")
+            copyIfPresent(fullMetadata, this, "operatorSessionInactivityMinutes")
+            copyIfPresent(fullMetadata, this, "sitePhotosBefore")
+            copyIfPresent(fullMetadata, this, "sitePhotosAfter")
+            copyIfPresent(fullMetadata, this, "operatorSessionPhotosBefore")
+            copyIfPresent(fullMetadata, this, "operatorSessionPhotosAfter")
+            copyIfPresent(fullMetadata, this, "siteSessionPhotoTotal")
+            copyIfPresent(fullMetadata, this, "operatorSessionPhotoTotal")
+            copyIfPresent(fullMetadata, this, "operatorSessionSitesVisited")
+            copyIfPresent(fullMetadata, this, "operatorSessionSitesVisitedBefore")
+            copyIfPresent(fullMetadata, this, "operatorSessionClockOutAt")
+            copyIfPresent(fullMetadata, this, "operatorSessionClockOutReason")
+            copyIfPresent(fullMetadata, this, "sessionFinalized")
+            copyIfPresent(fullMetadata, this, "siteDistanceM")
+            copyIfPresent(fullMetadata, this, "siteRadiusM")
+
             put("createdAt", System.currentTimeMillis())
         }
 
@@ -67,6 +84,10 @@ object EvidenceRegistryOutbox {
         return File(dir, "$safeName.json").also {
             it.writeText(publicRecord.toString(2))
         }
+    }
+
+    private fun copyIfPresent(source: JSONObject, target: JSONObject, key: String) {
+        if (source.has(key)) target.put(key, source.opt(key))
     }
 
     fun pending(context: Context): List<PendingRecord> =
@@ -97,20 +118,13 @@ object EvidenceRegistryOutbox {
         return "$ADMIN_URL?e=${URLEncoder.encode(encoded, "UTF-8")}"
     }
 
-
     suspend fun publish(context: Context, record: PendingRecord): RegistryPublisher.PublishResult {
         val result = RegistryPublisher.publish(context, record.file)
-        if (result.success) {
-            markPublished(context, record, result.registryUrl)
-        }
+        if (result.success) markPublished(context, record, result.registryUrl)
         return result
     }
 
-    fun publishFileSilently(
-        context: Context,
-        file: File,
-        registryUrl: String? = null
-    ): Boolean {
+    fun publishFileSilently(context: Context, file: File, registryUrl: String? = null): Boolean {
         if (!file.exists()) return false
         val publishedDir = File(context.filesDir, "evidence_registry_published").also { it.mkdirs() }
         val target = File(publishedDir, file.name)
@@ -126,11 +140,8 @@ object EvidenceRegistryOutbox {
         return false
     }
 
-    private fun markPublished(
-        context: Context,
-        record: PendingRecord,
-        registryUrl: String?
-    ): Boolean = publishFileSilently(context, record.file, registryUrl)
+    private fun markPublished(context: Context, record: PendingRecord, registryUrl: String?): Boolean =
+        publishFileSilently(context, record.file, registryUrl)
 
     fun publishedRecord(context: Context, evidenceId: String): JSONObject? {
         val file = File(
@@ -152,7 +163,5 @@ object EvidenceRegistryOutbox {
         File(context.filesDir, "evidence_registry_outbox").also { it.mkdirs() }
 
     private fun safeFileName(value: String): String =
-        value.lowercase()
-            .replace(Regex("[^a-z0-9._-]"), "-")
-            .trim('-')
+        value.lowercase().replace(Regex("[^a-z0-9._-]"), "-").trim('-')
 }

@@ -2,6 +2,7 @@ package com.axiominfratech.geostamp.core
 
 import android.content.Context
 import com.axiominfratech.geostamp.config.RemoteConfigManager
+import com.axiominfratech.geostamp.verification.OperatorSessionEvidenceFinalizer
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
@@ -15,7 +16,8 @@ import java.util.UUID
  * clock-out.
  */
 class OperatorSessionManager(context: Context) {
-    private val prefs = context.getSharedPreferences("geostamp_prefs", Context.MODE_PRIVATE)
+    private val appContext = context.applicationContext
+    private val prefs = appContext.getSharedPreferences("geostamp_prefs", Context.MODE_PRIVATE)
 
     data class Session(
         val id: String,
@@ -100,6 +102,14 @@ class OperatorSessionManager(context: Context) {
 
     fun end(reason: String, endedAt: Long = System.currentTimeMillis()): Session? {
         val current = readWithoutExpiry()
+        if (current != null) {
+            OperatorSessionEvidenceFinalizer.finalize(
+                context = appContext,
+                session = current,
+                clockOutAt = endedAt,
+                clockOutReason = reason
+            )
+        }
         prefs.edit()
             .putString(KEY_LAST_CLOCK_OUT_REASON, reason)
             .putLong(KEY_LAST_CLOCK_OUT_AT, endedAt)
@@ -171,7 +181,11 @@ class OperatorSessionManager(context: Context) {
 
     private fun jsonArrayToList(raw: String): List<String> = runCatching {
         val array = JSONArray(raw)
-        buildList { for (i in 0 until array.length()) array.optString(i).takeIf { it.isNotBlank() }?.let(::add) }
+        buildList {
+            for (i in 0 until array.length()) {
+                array.optString(i).takeIf { it.isNotBlank() }?.let(::add)
+            }
+        }
     }.getOrDefault(emptyList())
 
     private fun jsonObjectToIntMap(raw: String): Map<String, Int> = runCatching {

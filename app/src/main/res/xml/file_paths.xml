@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <files-path name="geostamp_temp"    path="photos/" />
-    <files-path name="gallery_exports"  path="gallery_exports/" />
-    <cache-path name="raw_captures"     path="captures/" />
+    <files-path name="geostamp_temp" path="photos/" />
+    <files-path name="gallery_exports" path="gallery_exports/" />
+    <cache-path name="raw_captures" path="captures/" />
+    <cache-path name="shared_reports" path="shared_reports/" />
     <external-path name="geostamp_photos" path="Pictures/GeoStamp/" />
 </paths>

@@ -31,6 +31,7 @@ import com.axiominfratech.geostamp.verification.DeviceProfileCollector
 import com.axiominfratech.geostamp.verification.DeviceIdentityManager
 import com.axiominfratech.geostamp.verification.EvidenceRegistryOutbox
 import com.axiominfratech.geostamp.verification.RegistryPublisher
+import com.axiominfratech.geostamp.verification.EvidenceSlipMetadata
 import com.axiominfratech.geostamp.core.OperatorSessionManager
 import com.axiominfratech.geostamp.config.RemoteConfigManager
 import org.json.JSONArray
@@ -380,6 +381,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
 
                 val stampedFile = cameraManager.captureAndStamp(overlayData, outputDir)
+                val slipThumbnailBase64 = withContext(Dispatchers.IO) {
+                    EvidenceSlipMetadata.thumbnailBase64(stampedFile)
+                }
+                val slipSession = EvidenceSlipMetadata.sessionSnapshot(operatorSession, siteIdStr)
 
                 // Enhancement happens once inside CameraManager before the overlay is drawn.
                 // Never process the stamped JPEG again: that would alter the QR, text and logos.
@@ -443,6 +448,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         put("operatorSessionStartedAt", operatorSession?.startedAt ?: 0L)
                         put("operatorSessionOperatorId", operatorSession?.operatorId ?: "")
                         put("operatorSessionOperatorName", operatorSession?.operatorName ?: "")
+                        put("thumbnailBase64", slipThumbnailBase64)
+                        val slipKeys = slipSession.keys()
+                        while (slipKeys.hasNext()) {
+                            val slipKey = slipKeys.next()
+                            put(slipKey, slipSession.opt(slipKey))
+                        }
                         put("distanceM",   distM)
                         put("timestamp",   location.timestampMs)
                         put("username",    config.username)

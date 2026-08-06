@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Subtle cyan edge glow -->
+    <item android:left="0dp" android:top="0dp" android:right="0dp" android:bottom="0dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#0C22D3EE"/>
+            <corners android:radius="26dp"/>
+        </shape>
+    </item>
+    <!-- Card body with gradient -->
+    <item android:left="1dp" android:top="1dp" android:right="1dp" android:bottom="1dp">
+        <shape android:shape="rectangle">
+            <gradient android:startColor="#111D33" android:endColor="#0A1220" android:angle="135"/>
+            <corners android:radius="25dp"/>
+            <stroke android:width="1dp" android:color="#1C2E4A"/>
+        </shape>
+    </item>
+</layer-list>

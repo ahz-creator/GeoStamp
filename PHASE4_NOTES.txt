@@ -1,0 +1,16 @@
+GeoStamp Phase 4 — Verification Foundation
+Changed files only.
+
+Implemented:
+- Permanent random Verification ID per capture (GST-YY-XXXX-XXXX-XXXX)
+- Stable QR JSON payload containing ID, capture time, marker version and location-risk flag
+- SHA-256 hash of the final enhanced/stamped JPEG
+- Metadata storage for verification ID, hash, provider, app/device and evidence status
+- Mock/spoof capture is allowed and retained as evidence
+- Red F marker is limited to strong forgery indicators, not ordinary weak GPS accuracy
+- Gallery verification percentage excludes risk/unhashed evidence
+- Gallery search supports Verification ID
+- Evidence manifest includes Verification ID and SHA-256
+
+Replace files at the same relative paths, Sync Gradle, Clean/Rebuild, then capture NEW photos.
+Old photos will not have the new Verification ID/hash metadata.

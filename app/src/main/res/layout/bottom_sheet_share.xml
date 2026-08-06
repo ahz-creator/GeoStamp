@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#0E1829"
+    android:paddingBottom="24dp">
+
+    <!-- Handle pill -->
+    <View android:layout_width="36dp" android:layout_height="4dp"
+        android:layout_gravity="center_horizontal" android:layout_marginTop="10dp"
+        android:layout_marginBottom="16dp"
+        android:background="#334155"/>
+
+    <!-- Title -->
+    <TextView android:id="@+id/tv_share_title"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:paddingStart="20dp" android:paddingEnd="20dp"
+        android:text="Share Site Album"
+        android:textColor="#F1F5F9" android:textSize="16sp" android:textStyle="bold"/>
+
+    <!-- Subtitle -->
+    <TextView android:id="@+id/tv_share_subtitle"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:paddingStart="20dp" android:paddingEnd="20dp"
+        android:layout_marginTop="3dp" android:layout_marginBottom="20dp"
+        android:textColor="#475569" android:textSize="12sp"/>
+
+    <!-- Divider -->
+    <View android:layout_width="match_parent" android:layout_height="1dp"
+        android:background="#162040" android:layout_marginBottom="8dp"/>
+
+    <!-- Photos option -->
+    <LinearLayout android:id="@+id/btn_share_photos"
+        android:layout_width="match_parent" android:layout_height="56dp"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:paddingStart="20dp" android:paddingEnd="20dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true" android:focusable="true">
+        <TextView android:layout_width="36dp" android:layout_height="wrap_content"
+            android:text="📷" android:textSize="20sp"/>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical"
+            android:layout_marginStart="12dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Share as Photos"
+                android:textColor="#F1F5F9" android:textSize="14sp" android:textStyle="bold"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Send photos via any app"
+                android:textColor="#475569" android:textSize="11sp"/>
+        </LinearLayout>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="›" android:textColor="#22D3EE" android:textSize="18sp"/>
+    </LinearLayout>
+
+    <!-- ZIP option -->
+    <LinearLayout android:id="@+id/btn_share_zip"
+        android:layout_width="match_parent" android:layout_height="56dp"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:paddingStart="20dp" android:paddingEnd="20dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true" android:focusable="true">
+        <TextView android:layout_width="36dp" android:layout_height="wrap_content"
+            android:text="🗜" android:textSize="20sp"/>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical"
+            android:layout_marginStart="12dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Export as ZIP"
+                android:textColor="#F1F5F9" android:textSize="14sp" android:textStyle="bold"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Bundle photos + evidence manifest"
+                android:textColor="#475569" android:textSize="11sp"/>
+        </LinearLayout>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="›" android:textColor="#22D3EE" android:textSize="18sp"/>
+    </LinearLayout>
+
+    <!-- Cancel -->
+    <LinearLayout android:id="@+id/btn_share_cancel"
+        android:layout_width="match_parent" android:layout_height="48dp"
+        android:orientation="horizontal" android:gravity="center"
+        android:paddingStart="20dp" android:paddingEnd="20dp"
+        android:layout_marginTop="4dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true" android:focusable="true">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Cancel" android:textColor="#64748B"
+            android:textSize="13sp"/>
+    </LinearLayout>
+
+</LinearLayout>

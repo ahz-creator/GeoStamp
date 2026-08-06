@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Top bar pill: dark glass with vivid cyan glow border + inner highlight -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Base dark navy fill -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#F0060A1A"/>
+            <corners android:radius="14dp"/>
+        </shape>
+    </item>
+    <!-- Outer glow border — vivid cyan, fully opaque -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@android:color/transparent"/>
+            <stroke android:width="1.5dp" android:color="#CC00B4E6"/>
+            <corners android:radius="14dp"/>
+        </shape>
+    </item>
+    <!-- Top edge highlight — bright thin line for premium feel -->
+    <item android:top="0dp" android:bottom="0dp" android:left="0dp" android:right="0dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@android:color/transparent"/>
+            <stroke android:width="0.5dp" android:color="#5500D4FF"/>
+            <corners android:radius="14dp"/>
+        </shape>
+    </item>
+</layer-list>

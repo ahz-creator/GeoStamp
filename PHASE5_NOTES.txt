@@ -1,0 +1,22 @@
+GeoStamp Phase 5 — Visit History + Device Profile + Capture Speed
+
+Changed files only.
+
+Features:
+- 25 m same-location radius
+- 90-day rolling history
+- same-day prior photo count
+- distinct visit sessions using a 60-minute gap
+- previous/first visit timestamps
+- trusted/warning/risk history counts
+- previous Verification ID
+- local device profile and GeoStamp installation ID
+- capture timeline metadata
+- gallery/PDF/ZIP history summaries
+- capture status changed from VERIFIED to REGISTERED
+- evidence-safe footer wording
+- camera extensions disabled by default
+- low-latency capture, 3200px processing cap, JPEG 92
+- stamped image is not enhanced a second time
+
+No backend or paid service is used.

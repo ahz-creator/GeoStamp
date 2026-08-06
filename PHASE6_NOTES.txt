@@ -1,0 +1,13 @@
+GeoStamp Phase 6 — Overlay and Workspace Rules
+
+1. Saved-photo evidence overlay defaults to 25% image height and is hard-limited to 20–30%.
+2. QR scales with the smaller overlay.
+3. Live camera information has one exclusive mode: Floating Card, Bottom Strip, or Off.
+4. Floating Card and Bottom Strip can no longer appear together.
+5. Personal visit history requires an exact Project/Title + Reference match before location-radius matching.
+6. Organization mode no longer permits manual organization changes on the camera screen.
+7. Settings organization selector is read-only and prepared for verified-email sign-in assignment.
+8. Site ID remains automatic from GPS/site database.
+9. Manual field-engineer username setting is removed; current fallback is Guest until sign-in is connected.
+
+Build note: XML was parsed successfully. A Gradle compile could not be run in this environment because gradle-wrapper.jar is absent from the uploaded project archive.

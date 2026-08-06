@@ -1,0 +1,6 @@
+GeoStamp Phase 7.1 — Operator Dialog and Layout Hotfix
+
+1. Operator picker now uses a visible single-choice list and a START SESSION button.
+2. Removed the AlertDialog message/list conflict that hid operator options on some Android themes.
+3. Workspace pill is now constrained above the Bottom Info Strip, preventing overlap.
+4. When the Bottom Info Strip is Off/Gone, the workspace pill falls back above the bottom controls.

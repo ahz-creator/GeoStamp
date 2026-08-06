@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    CaptureButton background — premium neon gradient ring
+    Technique: layer-list with 3 concentric ovals
+      Layer 1 (full size)  → semi-transparent outer glow halo
+      Layer 2 (inset 5dp)  → gradient oval (purple→blue)  ← this IS the ring color
+      Layer 3 (inset 10dp) → dark inner circle              ← hides the center, leaving only the ring rim
+    Result: a ~5dp gradient ring with a soft glow halo around it
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- ── PRESSED state: brighter glow, lighter gradient ── -->
+    <item android:state_pressed="true">
+        <layer-list>
+            <item>
+                <shape android:shape="oval">
+                    <solid android:color="#707C3AED"/>
+                </shape>
+            </item>
+            <item android:left="5dp" android:top="5dp"
+                  android:right="5dp" android:bottom="5dp">
+                <shape android:shape="oval">
+                    <gradient
+                        android:startColor="#B980FF"
+                        android:endColor="#38BDF8"
+                        android:angle="135"/>
+                </shape>
+            </item>
+            <item android:left="10dp" android:top="10dp"
+                  android:right="10dp" android:bottom="10dp">
+                <shape android:shape="oval">
+                    <gradient
+                        android:startColor="#200E50"
+                        android:endColor="#091A40"
+                        android:angle="135"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+
+    <!-- ── DISABLED state ── -->
+    <item android:state_enabled="false">
+        <shape android:shape="oval">
+            <solid android:color="#1E2D3D"/>
+        </shape>
+    </item>
+
+    <!-- ── DEFAULT state ── -->
+    <item>
+        <layer-list>
+            <item>
+                <shape android:shape="oval">
+                    <solid android:color="#507C3AED"/>
+                </shape>
+            </item>
+            <item android:left="5dp" android:top="5dp"
+                  android:right="5dp" android:bottom="5dp">
+                <shape android:shape="oval">
+                    <gradient
+                        android:startColor="#9B6DFF"
+                        android:endColor="#0EA5E9"
+                        android:angle="135"/>
+                </shape>
+            </item>
+            <item android:left="10dp" android:top="10dp"
+                  android:right="10dp" android:bottom="10dp">
+                <shape android:shape="oval">
+                    <gradient
+                        android:startColor="#1A0E3C"
+                        android:endColor="#08152E"
+                        android:angle="135"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+
+</selector>

@@ -1,0 +1,611 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0B0F1A"
+    android:fitsSystemWindows="true">
+
+    <!-- Header — paddingTop respects status bar when fitsSystemWindows is true -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="4dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:background="#0B0F1A">
+
+        <ImageButton
+            android:id="@+id/btn_back"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@drawable/ic_back"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:tint="#F1F5F9"
+            android:contentDescription="Back"/>
+
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="4dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="STAMP SETTINGS" android:textColor="#F1F5F9"
+                android:textSize="14sp" android:textStyle="bold" android:letterSpacing="0.06"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="GeoStamp · Axiom Infratech" android:textColor="#22D3EE"
+                android:textSize="9sp" android:textStyle="bold"
+                android:shadowColor="#8022D3EE" android:shadowDx="0" android:shadowDy="0" android:shadowRadius="6"/>
+        </LinearLayout>
+    </LinearLayout>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#2563EB"/>
+
+    <ScrollView android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:fadingEdgeLength="0dp">
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:paddingTop="16dp" android:paddingBottom="80dp">
+
+            <!-- Identity will come from verified email sign-in. -->
+
+            <!-- ═══ OPERATOR ════════════════════════════════════════════ -->
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="ORGANIZATION &amp; SITE MATCH" android:textColor="#60A5FA" android:textSize="9sp"
+                android:textStyle="bold" android:letterSpacing="0.18"
+                android:paddingStart="20dp" android:paddingBottom="10dp"/>
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginStart="12dp" android:layout_marginEnd="12dp"
+                android:layout_marginBottom="20dp"
+                android:background="@drawable/bg_card">
+
+                <LinearLayout android:layout_width="match_parent" android:layout_height="56dp"
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:paddingStart="16dp" android:paddingEnd="16dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:text="Organization"
+                        android:textColor="#94A3B8" android:textSize="13sp"/>
+                    <Spinner android:id="@+id/sp_operator"
+                        android:layout_width="160dp" android:layout_height="36dp"
+                        android:popupBackground="#0E1520"
+                        android:contentDescription="Assigned through verified sign-in"/>
+                </LinearLayout>
+
+                <View android:layout_width="match_parent" android:layout_height="1dp"
+                    android:background="#1E293B" android:layout_marginStart="16dp"/>
+
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingStart="16dp" android:paddingEnd="16dp"
+                    android:paddingTop="12dp" android:paddingBottom="12dp">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="horizontal" android:gravity="center_vertical">
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_weight="1" android:text="Site Match Radius"
+                            android:textColor="#94A3B8" android:textSize="13sp"/>
+                        <TextView android:id="@+id/tv_radius_value"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="10m" android:textColor="#60A5FA"
+                            android:textSize="13sp" android:textStyle="bold"/>
+                    </LinearLayout>
+                    <com.google.android.material.slider.Slider
+                        android:id="@+id/slider_radius"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:valueFrom="5" android:valueTo="3000"
+                        android:stepSize="5" android:value="10"
+                        app:thumbColor="@color/accent"
+                        app:trackColorActive="@color/accent"
+                        app:trackColorInactive="@color/divider"/>
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:text="Organization is assigned through verified sign-in; Site ID is matched automatically from GPS data."
+                        android:textColor="#334155" android:textSize="10sp"/>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ═══ SECURITY ══════════════════════════════════════════ -->
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="SECURITY" android:textColor="#60A5FA" android:textSize="9sp"
+                android:textStyle="bold" android:letterSpacing="0.18"
+                android:paddingStart="20dp" android:paddingBottom="10dp"/>
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginStart="12dp" android:layout_marginEnd="12dp"
+                android:layout_marginBottom="20dp"
+                android:background="@drawable/bg_card">
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switch_block_spoof"
+                    style="@style/SettingsSwitch"
+                    android:text="Block capture if spoofing detected"
+                    android:paddingStart="16dp" android:paddingEnd="16dp"/>
+            </LinearLayout>
+
+            <!-- ═══ OVERLAY APPEARANCE ══════════════════════════════════ -->
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="OVERLAY APPEARANCE" android:textColor="#60A5FA" android:textSize="9sp"
+                android:textStyle="bold" android:letterSpacing="0.18"
+                android:paddingStart="20dp" android:paddingBottom="10dp"/>
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginStart="12dp" android:layout_marginEnd="12dp"
+                android:layout_marginBottom="20dp"
+                android:background="@drawable/bg_card">
+
+                <!-- Transparency slider -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingStart="16dp" android:paddingEnd="16dp"
+                    android:paddingTop="14dp" android:paddingBottom="4dp">
+
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="horizontal" android:gravity="center_vertical">
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_weight="1" android:text="Overlay Transparency"
+                            android:textColor="#94A3B8" android:textSize="13sp"/>
+                        <TextView android:id="@+id/tv_alpha_value"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="60%" android:textColor="#60A5FA"
+                            android:textSize="13sp" android:textStyle="bold"/>
+                    </LinearLayout>
+
+                    <com.google.android.material.slider.Slider
+                        android:id="@+id/slider_overlay_alpha"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:valueFrom="20" android:valueTo="90"
+                        android:stepSize="5" android:value="60"
+                        app:thumbColor="@color/accent"
+                        app:trackColorActive="@color/accent"
+                        app:trackColorInactive="@color/divider"/>
+
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="More transparent" android:textColor="#334155" android:textSize="10sp"/>
+                        <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="More opaque" android:textColor="#334155" android:textSize="10sp"/>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <View android:layout_width="match_parent" android:layout_height="1dp"
+                    android:background="#1E293B" android:layout_marginStart="16dp" android:layout_marginTop="8dp"/>
+
+                <!-- ── Overlay Size slider ── -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingStart="16dp" android:paddingEnd="16dp"
+                    android:paddingTop="14dp" android:paddingBottom="4dp">
+
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="horizontal" android:gravity="center_vertical">
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_weight="1" android:text="Saved Overlay Height"
+                            android:textColor="#94A3B8" android:textSize="13sp"/>
+                        <TextView android:id="@+id/tv_scale_value"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="25%" android:textColor="#60A5FA"
+                            android:textSize="13sp" android:textStyle="bold"/>
+                    </LinearLayout>
+
+                    <com.google.android.material.slider.Slider
+                        android:id="@+id/slider_overlay_scale"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:valueFrom="20" android:valueTo="30"
+                        android:stepSize="1" android:value="25"
+                        app:thumbColor="@color/brand_violet"
+                        app:trackColorActive="@color/brand_violet"
+                        app:trackColorInactive="@color/divider"/>
+
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="20% (more photo)" android:textColor="#334155" android:textSize="10sp"/>
+                        <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="30% maximum" android:textColor="#334155" android:textSize="10sp"/>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <View android:layout_width="match_parent" android:layout_height="1dp"
+                    android:background="#1E293B" android:layout_marginStart="16dp" android:layout_marginTop="8dp"/>
+
+                <!-- Live preview card -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingStart="16dp" android:paddingEnd="16dp"
+                    android:paddingTop="12dp" android:paddingBottom="14dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="PREVIEW" android:textColor="#475569" android:textSize="9sp"
+                        android:textStyle="bold" android:letterSpacing="0.12"
+                        android:layout_marginBottom="8dp"/>
+                    <!-- Preview card mirrors the live camera overlay exactly -->
+                    <LinearLayout
+                        android:id="@+id/overlay_preview_card_alpha"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="14dp"
+                        android:background="@drawable/bg_overlay_card">
+
+                        <!-- Header row -->
+                        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:orientation="horizontal" android:gravity="center_vertical"
+                            android:layout_marginBottom="5dp">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="● " android:textColor="#4CAF50" android:textSize="12sp" android:textStyle="bold"/>
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="Location Acquired" android:textColor="#FFFFFF"
+                                android:textSize="12sp" android:textStyle="bold"/>
+                        </LinearLayout>
+
+                        <!-- Coordinates -->
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="24.8610° N, 67.0101° E"
+                            android:textColor="#FFFFFF" android:textSize="12sp" android:textStyle="bold"
+                            android:fontFamily="monospace" android:layout_marginBottom="3dp"/>
+
+                        <!-- Accuracy row -->
+                        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:orientation="horizontal" android:gravity="center_vertical"
+                            android:layout_marginBottom="8dp">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="± 4.0 m  •  Accuracy: " android:textColor="#B0BEC5" android:textSize="10sp"/>
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="High" android:textColor="#4CAF50" android:textSize="10sp" android:textStyle="bold"/>
+                        </LinearLayout>
+
+                        <View android:layout_width="match_parent" android:layout_height="1dp"
+                            android:background="#22FFFFFF" android:layout_marginBottom="7dp"/>
+
+                        <!-- Date row -->
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="▣  02 May 2026, 14:30"
+                            android:textColor="#E0E0E0" android:textSize="11sp" android:layout_marginBottom="7dp"/>
+
+                        <View android:layout_width="match_parent" android:layout_height="1dp"
+                            android:background="#22FFFFFF" android:layout_marginBottom="7dp"/>
+
+                        <!-- Operator row -->
+                        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:orientation="horizontal" android:gravity="center_vertical"
+                            android:layout_marginBottom="7dp">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="◈  Operator:  " android:textColor="#90A4AE" android:textSize="10sp"/>
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="Jazz" android:textColor="#38BDF8" android:textSize="11sp" android:textStyle="bold"/>
+                        </LinearLayout>
+
+                        <View android:layout_width="match_parent" android:layout_height="1dp"
+                            android:background="#22FFFFFF" android:layout_marginBottom="7dp"/>
+
+                        <!-- Site ID row -->
+                        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:orientation="horizontal" android:gravity="center_vertical">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="⊞  Site ID:  " android:textColor="#90A4AE" android:textSize="10sp"/>
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="PKZ-KHI-001" android:textColor="#C084FC" android:textSize="11sp"
+                                android:textStyle="bold" android:fontFamily="monospace"/>
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ═══ LIVE CAMERA INFORMATION ═══════════════════════════ -->
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="LIVE CAMERA INFORMATION" android:textColor="#60A5FA" android:textSize="9sp"
+                android:textStyle="bold" android:letterSpacing="0.18"
+                android:paddingStart="20dp" android:paddingBottom="10dp"/>
+
+            <RadioGroup
+                android:id="@+id/radio_group_live_info"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginStart="12dp" android:layout_marginEnd="12dp"
+                android:layout_marginBottom="20dp"
+                android:background="@drawable/bg_card"
+                android:padding="12dp">
+
+                <RadioButton android:id="@+id/radio_live_floating"
+                    android:layout_width="match_parent" android:layout_height="48dp"
+                    android:text="Floating Info Card"
+                    android:textColor="#F1F5F9" android:textSize="13sp"
+                    android:buttonTint="#22D3EE" android:checked="true"/>
+                <RadioButton android:id="@+id/radio_live_bottom"
+                    android:layout_width="match_parent" android:layout_height="48dp"
+                    android:text="Bottom Info Strip"
+                    android:textColor="#F1F5F9" android:textSize="13sp"
+                    android:buttonTint="#CE93D8"/>
+                <RadioButton android:id="@+id/radio_live_off"
+                    android:layout_width="match_parent" android:layout_height="48dp"
+                    android:text="Off"
+                    android:textColor="#F1F5F9" android:textSize="13sp"
+                    android:buttonTint="#94A3B8"/>
+            </RadioGroup>
+
+            <!-- ═══ COLOR SCHEME ══════════════════════════════════════════ -->
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="OVERLAY COLOR SCHEME" android:textColor="#60A5FA" android:textSize="9sp"
+                android:textStyle="bold" android:letterSpacing="0.18"
+                android:paddingStart="20dp" android:paddingBottom="10dp"/>
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginStart="12dp" android:layout_marginEnd="12dp"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/bg_card">
+
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="Choose background color for both overlays"
+                    android:textColor="#475569" android:textSize="11sp"
+                    android:paddingStart="16dp" android:paddingEnd="16dp"
+                    android:paddingTop="12dp" android:paddingBottom="4dp"/>
+
+                <!-- Color swatch row -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:paddingStart="12dp" android:paddingEnd="12dp"
+                    android:paddingTop="12dp" android:paddingBottom="12dp">
+
+                    <!-- Black Glass -->
+                    <LinearLayout android:id="@+id/container_swatch_black"
+                        android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:orientation="vertical"
+                        android:gravity="center">
+                        <FrameLayout android:layout_width="44dp" android:layout_height="44dp"
+                            android:layout_gravity="center">
+                            <View android:layout_width="44dp" android:layout_height="44dp"
+                                android:background="@drawable/bg_color_swatch_black"/>
+                            <ImageView
+                                android:id="@+id/iv_check_black"
+                                android:layout_width="20dp" android:layout_height="20dp"
+                                android:src="@drawable/ic_check_circle"
+                                android:layout_gravity="center"
+                                app:tint="#FFFFFF"
+                                android:visibility="visible"/>
+                        </FrameLayout>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="Black" android:textColor="#94A3B8" android:textSize="9sp"
+                            android:layout_marginTop="4dp"/>
+                        <View android:id="@+id/swatch_black"
+                            android:layout_width="44dp" android:layout_height="44dp"
+                            android:visibility="gone"/>
+                    </LinearLayout>
+
+                    <!-- Navy Blue -->
+                    <LinearLayout android:id="@+id/container_swatch_navy"
+                        android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:orientation="vertical"
+                        android:gravity="center">
+                        <FrameLayout android:layout_width="44dp" android:layout_height="44dp"
+                            android:layout_gravity="center">
+                            <View android:layout_width="44dp" android:layout_height="44dp"
+                                android:background="@drawable/bg_color_swatch_navy"/>
+                            <ImageView
+                                android:id="@+id/iv_check_navy"
+                                android:layout_width="20dp" android:layout_height="20dp"
+                                android:src="@drawable/ic_check_circle"
+                                android:layout_gravity="center"
+                                app:tint="#FFFFFF"
+                                android:visibility="gone"/>
+                        </FrameLayout>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="Navy" android:textColor="#94A3B8" android:textSize="9sp"
+                            android:layout_marginTop="4dp"/>
+                        <View android:id="@+id/swatch_navy"
+                            android:layout_width="44dp" android:layout_height="44dp"
+                            android:visibility="gone"/>
+                    </LinearLayout>
+
+                    <!-- Forest Green -->
+                    <LinearLayout android:id="@+id/container_swatch_forest"
+                        android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:orientation="vertical"
+                        android:gravity="center">
+                        <FrameLayout android:layout_width="44dp" android:layout_height="44dp"
+                            android:layout_gravity="center">
+                            <View android:layout_width="44dp" android:layout_height="44dp"
+                                android:background="@drawable/bg_color_swatch_forest"/>
+                            <ImageView
+                                android:id="@+id/iv_check_forest"
+                                android:layout_width="20dp" android:layout_height="20dp"
+                                android:src="@drawable/ic_check_circle"
+                                android:layout_gravity="center"
+                                app:tint="#FFFFFF"
+                                android:visibility="gone"/>
+                        </FrameLayout>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="Forest" android:textColor="#94A3B8" android:textSize="9sp"
+                            android:layout_marginTop="4dp"/>
+                        <View android:id="@+id/swatch_forest"
+                            android:layout_width="44dp" android:layout_height="44dp"
+                            android:visibility="gone"/>
+                    </LinearLayout>
+
+                    <!-- Dark Maroon -->
+                    <LinearLayout android:id="@+id/container_swatch_maroon"
+                        android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:orientation="vertical"
+                        android:gravity="center">
+                        <FrameLayout android:layout_width="44dp" android:layout_height="44dp"
+                            android:layout_gravity="center">
+                            <View android:layout_width="44dp" android:layout_height="44dp"
+                                android:background="@drawable/bg_color_swatch_maroon"/>
+                            <ImageView
+                                android:id="@+id/iv_check_maroon"
+                                android:layout_width="20dp" android:layout_height="20dp"
+                                android:src="@drawable/ic_check_circle"
+                                android:layout_gravity="center"
+                                app:tint="#FFFFFF"
+                                android:visibility="gone"/>
+                        </FrameLayout>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="Maroon" android:textColor="#94A3B8" android:textSize="9sp"
+                            android:layout_marginTop="4dp"/>
+                        <View android:id="@+id/swatch_maroon"
+                            android:layout_width="44dp" android:layout_height="44dp"
+                            android:visibility="gone"/>
+                    </LinearLayout>
+
+                    <!-- Custom color picker -->
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:orientation="vertical"
+                        android:gravity="center">
+                        <FrameLayout android:layout_width="44dp" android:layout_height="44dp"
+                            android:layout_gravity="center"
+                            android:id="@+id/btn_custom_color">
+                            <View android:layout_width="44dp" android:layout_height="44dp"
+                                android:background="@drawable/bg_color_swatch_custom"/>
+                            <ImageView
+                                android:id="@+id/iv_check_custom"
+                                android:layout_width="20dp" android:layout_height="20dp"
+                                android:src="@drawable/ic_check_circle"
+                                android:layout_gravity="center"
+                                app:tint="#FFFFFF"
+                                android:visibility="gone"/>
+                        </FrameLayout>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="Custom" android:textColor="#94A3B8" android:textSize="9sp"
+                            android:layout_marginTop="4dp"/>
+                        <View android:id="@+id/swatch_custom"
+                            android:layout_width="44dp" android:layout_height="44dp"
+                            android:visibility="gone"/>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Custom color input row (shown when Custom is selected) -->
+                <LinearLayout
+                    android:id="@+id/row_custom_color"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:paddingStart="16dp" android:paddingEnd="16dp"
+                    android:paddingTop="4dp" android:paddingBottom="14dp"
+                    android:visibility="gone">
+
+                    <View
+                        android:id="@+id/iv_custom_color_preview"
+                        android:layout_width="28dp" android:layout_height="28dp"
+                        android:background="@drawable/bg_color_swatch_custom"
+                        android:layout_marginEnd="10dp"/>
+
+                    <EditText
+                        android:id="@+id/et_custom_color_hex"
+                        android:layout_width="0dp" android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:hint="#RRGGBB  e.g. #1A237E"
+                        android:textColor="#F1F5F9" android:textColorHint="#334155"
+                        android:textSize="13sp" android:background="@null"
+                        android:singleLine="true"
+                        android:inputType="text"
+                        android:imeOptions="actionDone"
+                        android:fontFamily="monospace"/>
+
+                    <TextView
+                        android:id="@+id/btn_apply_custom_color"
+                        android:layout_width="wrap_content" android:layout_height="36dp"
+                        android:text="Apply"
+                        android:textColor="#60A5FA" android:textSize="13sp"
+                        android:textStyle="bold" android:gravity="center"
+                        android:paddingStart="12dp" android:paddingEnd="4dp"
+                        android:clickable="true" android:focusable="true"/>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ═══ COLOR SCHEME LIVE PREVIEW ═══════════════════════════ -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginStart="12dp" android:layout_marginEnd="12dp"
+                android:layout_marginBottom="20dp"
+                android:background="@drawable/bg_card"
+                android:paddingStart="16dp" android:paddingEnd="16dp"
+                android:paddingTop="12dp" android:paddingBottom="14dp">
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="LIVE PREVIEW" android:textColor="#475569" android:textSize="9sp"
+                    android:textStyle="bold" android:letterSpacing="0.12"
+                    android:layout_marginBottom="8dp"/>
+
+                <LinearLayout
+                    android:id="@+id/overlay_preview_card"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="14dp"
+                    android:background="@drawable/bg_overlay_card">
+
+                    <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:orientation="horizontal" android:gravity="center_vertical"
+                        android:layout_marginBottom="5dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="● " android:textColor="#4CAF50" android:textSize="12sp" android:textStyle="bold"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="Location Acquired" android:textColor="#FFFFFF"
+                            android:textSize="12sp" android:textStyle="bold"/>
+                    </LinearLayout>
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="24.8610° N, 67.0101° E"
+                        android:textColor="#FFFFFF" android:textSize="12sp" android:textStyle="bold"
+                        android:fontFamily="monospace" android:layout_marginBottom="3dp"/>
+
+                    <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:orientation="horizontal" android:gravity="center_vertical"
+                        android:layout_marginBottom="8dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="± 4.0 m  •  Accuracy: " android:textColor="#B0BEC5" android:textSize="10sp"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="High" android:textColor="#4CAF50" android:textSize="10sp" android:textStyle="bold"/>
+                    </LinearLayout>
+
+                    <View android:layout_width="match_parent" android:layout_height="1dp"
+                        android:background="#22FFFFFF" android:layout_marginBottom="7dp"/>
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="▣  02 May 2026, 14:30"
+                        android:textColor="#E0E0E0" android:textSize="11sp" android:layout_marginBottom="7dp"/>
+
+                    <View android:layout_width="match_parent" android:layout_height="1dp"
+                        android:background="#22FFFFFF" android:layout_marginBottom="7dp"/>
+
+                    <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:orientation="horizontal" android:gravity="center_vertical"
+                        android:layout_marginBottom="7dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="◈  Operator:  " android:textColor="#90A4AE" android:textSize="10sp"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="Jazz" android:textColor="#38BDF8" android:textSize="11sp" android:textStyle="bold"/>
+                    </LinearLayout>
+
+                    <View android:layout_width="match_parent" android:layout_height="1dp"
+                        android:background="#22FFFFFF" android:layout_marginBottom="7dp"/>
+
+                    <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:orientation="horizontal" android:gravity="center_vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="⊞  Site ID:  " android:textColor="#90A4AE" android:textSize="10sp"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="PKZ-KHI-001" android:textColor="#C084FC" android:textSize="11sp"
+                            android:textStyle="bold" android:fontFamily="monospace"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Version -->
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="GeoStamp v4.0 · Axiom Infratech Pvt. Ltd."
+                android:textColor="#1E293B" android:textSize="9sp"
+                android:gravity="center" android:paddingTop="8dp"/>
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

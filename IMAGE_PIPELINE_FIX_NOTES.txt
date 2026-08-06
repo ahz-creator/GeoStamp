@@ -1,0 +1,16 @@
+GeoStamp image pipeline hotfix
+
+Changed files:
+1. app/src/main/java/com/axiominfratech/geostamp/ui/MainViewModel.kt
+   - Removed the second enhancement pass that was applied after the overlay and QR were rendered.
+   - Final stamped JPEG is now preserved exactly as produced by CameraManager + OverlayRenderer.
+
+2. app/src/main/java/com/axiominfratech/geostamp/camera/ImageEnhancer.kt
+   - Fixed RGB channel arithmetic precedence in applyBellLift().
+   - Prevents false-colour/pink block artefacts when adaptive enhancement is used.
+
+Expected result:
+- Normal photo colours.
+- QR remains black on white.
+- Overlay text/logos remain unchanged.
+- One enhancement pass only, before overlay rendering.

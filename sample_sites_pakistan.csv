@@ -1,0 +1,21 @@
+site_id,operator,site_name,sector,latitude,longitude,city,province,technology
+KHI-JZZ-001,Jazz,Saddar Exchange,Alpha 0°,24.860966,67.010534,Karachi,Sindh,4G
+KHI-JZZ-002,Jazz,Clifton Beach,Beta 120°,24.813682,67.028519,Karachi,Sindh,4G
+KHI-JZZ-003,Jazz,PECHS Block 6,Gamma 240°,24.880000,67.065000,Karachi,Sindh,4G
+KHI-ZNG-001,Zong,DHA Phase 5,Alpha 0°,24.809823,67.060415,Karachi,Sindh,5G
+KHI-ZNG-002,Zong,Gulshan Chowrangi,Beta 120°,24.921200,67.094000,Karachi,Sindh,4G
+KHI-TNR-001,Telenor,Gulshan-e-Iqbal,Gamma 240°,24.921938,67.093912,Karachi,Sindh,4G
+KHI-UFN-001,Ufone,North Nazimabad,Alpha 0°,24.942000,67.032000,Karachi,Sindh,4G
+LHR-JZZ-001,Jazz,Liberty Market,Alpha 0°,31.522300,74.329399,Lahore,Punjab,4G
+LHR-JZZ-002,Jazz,Gulberg Main Blvd,Beta 120°,31.514000,74.346000,Lahore,Punjab,5G
+LHR-UFN-001,Ufone,Gulberg III,Beta 120°,31.518000,74.351000,Lahore,Punjab,4G
+LHR-ZNG-001,Zong,DHA Y-Block,Alpha 0°,31.481200,74.396100,Lahore,Punjab,5G
+LHR-TNR-001,Telenor,Model Town,Alpha 0°,31.483000,74.313000,Lahore,Punjab,4G
+ISB-PTL-001,PTCL,Blue Area,Alpha 0°,33.728519,73.093946,Islamabad,ICT,4G
+ISB-TNR-001,Telenor,F-7 Markaz,Beta 120°,33.722580,73.056190,Islamabad,ICT,4G
+ISB-JZZ-001,Jazz,G-9 Markaz,Alpha 0°,33.687000,73.045000,Islamabad,ICT,4G
+ISB-ZNG-001,Zong,F-10 Markaz,Alpha 0°,33.703000,73.022000,Islamabad,ICT,5G
+PEW-JZZ-001,Jazz,Saddar Peshawar,Alpha 0°,34.008311,71.578729,Peshawar,KPK,4G
+PEW-ZNG-001,Zong,University Road,Beta 120°,34.025000,71.555000,Peshawar,KPK,4G
+MZD-SCO-001,SCO,Muzaffarabad City,Alpha 0°,34.370000,73.471000,Muzaffarabad,AJK,3G
+QTA-JZZ-001,Jazz,Quetta Cantt,Alpha 0°,30.194000,67.009000,Quetta,Balochistan,4G

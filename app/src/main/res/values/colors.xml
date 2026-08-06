@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ── Brand ─────────────────────────────────────── -->
+    <color name="brand_blue">#0EA5E9</color>
+    <color name="brand_teal">#14B8A6</color>
+    <color name="brand_violet">#8B5CF6</color>
+    <color name="brand_dark">#0B0F1A</color>
+
+    <!-- ── GPS status ─────────────────────────────────── -->
+    <color name="gps_locked">#10B981</color>
+    <color name="gps_searching">#F59E0B</color>
+    <color name="gps_spoofed">#EF4444</color>
+
+    <!-- ── Surface / background ───────────────────────── -->
+    <color name="surface_dark">#0B0F1A</color>
+    <color name="surface_card">#111827</color>
+    <color name="surface_panel">#0D1321</color>
+    <color name="border_subtle">#1F2D45</color>
+
+    <!-- ── Text ───────────────────────────────────────── -->
+    <color name="text_primary">#F1F5F9</color>
+    <color name="text_secondary">#94A3B8</color>
+    <color name="text_accent">#38BDF8</color>
+    <color name="gold">#FBBF24</color>
+
+    <!-- ── Vibrant accent gradient pair ───────────────── -->
+    <color name="gradient_start">#0EA5E9</color>
+    <color name="gradient_end">#8B5CF6</color>
+
+    <!-- ── Legacy aliases (keep existing drawables happy) -->
+    <color name="primary_text">#F1F5F9</color>
+    <color name="secondary_text">#94A3B8</color>
+    <color name="bg_dark">#0B0F1A</color>
+    <color name="bg_surface">#111827</color>
+    <color name="accent">#0EA5E9</color>
+    <color name="accent_light">#38BDF8</color>
+    <color name="divider">#1F2D45</color>
+    <color name="hint_text">#475569</color>
+
+    <!-- ── Brand Header ──────────────────────────────────── -->
+    <color name="header_bg">#0B1220</color>
+    <color name="header_border">#2E8B5CF6</color>
+    <color name="header_shimmer">#BDC4B5FD</color>
+    <color name="header_pin_dark">#5B21B6</color>
+    <color name="header_pin_mid">#7C3AED</color>
+    <color name="header_pin_light">#C4B5FD</color>
+    <color name="header_subtitle">#80B4C3E4</color>
+    <color name="header_axiom_accent">#8B5CF6</color>
+
+    <!-- Material required -->
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>

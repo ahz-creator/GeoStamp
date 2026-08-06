@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    HUD Control Button — Gallery and Settings buttons
+    Glass dark with subtle white border
+-->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#3329B6F6">
+    <item android:id="@android:id/mask">
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFF"/>
+            <corners android:radius="14dp"/>
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#55000000"/>
+            <corners android:radius="14dp"/>
+            <stroke android:width="1dp" android:color="#33FFFFFF"/>
+        </shape>
+    </item>
+</ripple>

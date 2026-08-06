@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#070a14">
+  <title>GeoStamp Evidence Verification</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="brand">
+      <div class="pin">●</div>
+      <div><h1>GeoStamp</h1><p>Evidence Verification · Axiom InfraTech</p></div>
+    </header>
+
+    <section id="empty" class="card">
+      <h2>Verify received evidence</h2>
+      <p>Scan the QR from a GeoStamp photo, paste its verification link, or select the received image. Image processing remains on this device.</p>
+      <label class="field">Verification link or payload
+        <textarea id="manual" rows="3" placeholder="Paste GeoStamp verification URL or encoded payload"></textarea>
+      </label>
+      <div class="actions">
+        <button id="verifyManual">Verify</button>
+        <label class="button secondary">Select photo<input id="imageInput" type="file" accept="image/*" hidden></label>
+      </div>
+      <p id="scanHelp" class="note"></p>
+    </section>
+
+    <section id="result" class="card hidden">
+      <div class="status-row">
+        <div><span class="eyebrow">EVIDENCE STATUS</span><h2 id="status">REGISTERED</h2></div>
+        <span id="riskBadge" class="badge">LOCATION RECORDED</span>
+      </div>
+      <img id="thumb" class="thumb hidden" alt="Selected evidence thumbnail">
+      <div class="grid" id="details"></div>
+      <div class="finding" id="finding"></div>
+      <div class="actions"><button id="newCheck" class="secondary">Check another</button></div>
+    </section>
+
+    <section class="card compact">
+      <h3>What this result means</h3>
+      <p>This zero-cost public portal reads the signed-format QR payload locally. It reports the capture record and location-risk flag contained in that QR. Exact image-hash matching requires a future public evidence registry and is not claimed by this version.</p>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

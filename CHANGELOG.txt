@@ -1,0 +1,20 @@
+GeoStamp Evidence ID + Device QR Patch
+
+Modified files only:
+1. VerificationEngine.kt
+2. MainViewModel.kt
+3. EvidenceRegistryOutbox.kt
+
+Implemented:
+- One permanent user-facing identifier: Evidence ID.
+- Old Verification ID remains only as a compatibility alias with exactly the same value.
+- QR marker upgraded to v3.
+- QR now carries public-safe device-of-capture fields:
+  masked GeoStamp Device Identity, phone brand, model and capture-key fingerprint prefix.
+- Every new metadata record stores evidenceId.
+- Public registry files use the same Evidence ID.
+- Device identity is generated before stamping so the QR and final evidence metadata refer to the same capture device.
+- No extra identifier is generated at registration or verification.
+
+Important:
+The QR cannot contain the final image hash or capture signature because the QR is drawn before the final stamped image exists. Those fields remain in the sealed metadata/public registry report.

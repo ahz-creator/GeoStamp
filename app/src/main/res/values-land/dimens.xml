@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Landscape overrides — same compact proportions as portrait -->
+<resources>
+    <dimen name="top_bar_height">54dp</dimen>
+    <dimen name="top_icon_size">34dp</dimen>
+    <dimen name="top_icon_padding">8dp</dimen>
+    <dimen name="gps_indicator_height">26dp</dimen>
+    <dimen name="app_title_size">15sp</dimen>
+    <dimen name="app_subtitle_size">10sp</dimen>
+
+    <dimen name="control_btn_height">40dp</dimen>
+    <dimen name="control_btn_icon_size">18dp</dimen>
+    <dimen name="control_btn_text_size">8sp</dimen>
+    <dimen name="control_btn_margin">4dp</dimen>
+    <dimen name="capture_btn_size">72dp</dimen>
+    <dimen name="capture_btn_padding">18dp</dimen>
+    <dimen name="bottom_panel_padding_top">6dp</dimen>
+    <dimen name="bottom_panel_padding_bottom">4dp</dimen>
+</resources>

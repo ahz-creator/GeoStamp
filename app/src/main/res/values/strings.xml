@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GeoStamp</string>
+    <string name="app_tagline">Field Verification System</string>
+    <string name="company_name">AXIOM INFRATECH</string>
+    <string name="gps_searching">Acquiring Signal…</string>
+    <string name="gps_locked">GPS Locked</string>
+    <string name="gps_spoofed">Location Tampered</string>
+    <string name="no_coords">– –.– – – – – –, – –.– – – – – –</string>
+    <string name="accuracy_placeholder">± – – m</string>
+
+    <string name="gallery_title">GeoStamp Photos</string>
+    <string name="no_photos">No GeoStamp photos yet</string>
+</resources>

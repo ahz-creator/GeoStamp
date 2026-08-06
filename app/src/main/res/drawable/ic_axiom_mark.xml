@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Axiom Infratech Logo Mark
+    Outer hexagon frame + inner purple gradient triangle + exclamation detail
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="36dp"
+    android:height="36dp"
+    android:viewportWidth="36"
+    android:viewportHeight="36">
+
+    <!-- Outer hexagon outline -->
+    <path
+        android:pathData="M18,2 L32,10 L32,26 L18,34 L4,26 L4,10 Z"
+        android:fillColor="#00000000"
+        android:strokeColor="#408B5CF6"
+        android:strokeWidth="1"/>
+
+    <!-- Inner filled triangle - lighter purple -->
+    <path
+        android:pathData="M18,7 L29,25 L7,25 Z"
+        android:fillColor="#A78BFA"/>
+
+    <!-- Inner triangle overlay - darker, creates gradient feel -->
+    <path
+        android:pathData="M18,10 L27,24 L9,24 Z"
+        android:fillColor="#7C3AED"/>
+
+    <!-- Dark cutout inside triangle -->
+    <path
+        android:pathData="M18,13 L24,23 L12,23 Z"
+        android:fillColor="#0B1220"
+        android:fillAlpha="0.6"/>
+
+    <!-- Exclamation line -->
+    <path
+        android:pathData="M18,16 L18,20"
+        android:strokeColor="#C4B5FD"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"/>
+
+    <!-- Exclamation dot -->
+    <path
+        android:pathData="M18,22.2 m-1,0 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0"
+        android:fillColor="#C4B5FD"/>
+
+</vector>

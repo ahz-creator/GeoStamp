@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Base.Theme.GeoStamp" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/brand_blue</item>
+        <item name="colorPrimaryVariant">@color/surface_dark</item>
+        <item name="colorOnPrimary">@color/text_primary</item>
+        <item name="colorSecondary">@color/gold</item>
+        <item name="colorOnSecondary">@color/black</item>
+        <item name="android:windowBackground">@color/brand_dark</item>
+        <!-- Transparent bars — camera preview shows edge-to-edge -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowTranslucentStatus">false</item>
+        <item name="android:windowTranslucentNavigation">false</item>
+        <item name="android:windowTranslucentNavigation">false</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+
+    <style name="Theme.GeoStamp" parent="Base.Theme.GeoStamp"/>
+
+    <!-- Chip style — operator selector -->
+    <style name="GeoStampChip" parent="Widget.MaterialComponents.Chip.Action">
+        <item name="android:textColor">#38BDF8</item>
+        <item name="android:textSize">12sp</item>
+        <item name="chipBackgroundColor">#0E1A2E</item>
+        <item name="chipStrokeColor">#0EA5E9</item>
+        <item name="chipStrokeWidth">1dp</item>
+        <item name="chipIconTint">@color/brand_blue</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+
+    <!-- Switch row item -->
+    <style name="SwitchRow">
+        <item name="android:background">?attr/selectableItemBackground</item>
+        <item name="android:padding">14dp</item>
+    </style>
+
+    <!-- Settings switch style — used by fragment_stamp_options -->
+    <style name="SettingsSwitch" parent="Widget.MaterialComponents.CompoundButton.Switch">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">52dp</item>
+        <item name="android:textColor">@color/primary_text</item>
+        <item name="android:textSize">13sp</item>
+        <item name="thumbTint">@color/accent</item>
+        <item name="trackTint">@color/accent</item>
+    </style>
+
+    <style name="ThemeOverlay.App.MaterialAlertDialog" parent="ThemeOverlay.MaterialComponents.MaterialAlertDialog">
+        <item name="colorSurface">#0E1829</item>
+        <item name="colorOnSurface">#F1F5F9</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.MaterialComponents.Button.TextButton</item>
+    </style>
+
+    <!-- ShapeAppearance for rounded image corners -->
+    <style name="ShapeAppearance.Corner12" parent="ShapeAppearance.MaterialComponents.SmallComponent">
+        <item name="cornerSize">12dp</item>
+    </style>
+    <style name="ShapeAppearance.Corner16" parent="ShapeAppearance.MaterialComponents.SmallComponent">
+        <item name="cornerSize">16dp</item>
+    </style>
+    <style name="ShapeAppearance.Corner10" parent="ShapeAppearance.MaterialComponents.SmallComponent">
+        <item name="cornerSize">10dp</item>
+    </style>
+
+    <!-- Dark bottom sheet for share dialog -->
+    <style name="DarkBottomSheetDialog" parent="Theme.Design.Light.BottomSheetDialog">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="bottomSheetStyle">@style/DarkBottomSheetStyle</item>
+    </style>
+
+    <style name="DarkBottomSheetStyle" parent="Widget.Design.BottomSheet.Modal">
+        <item name="android:background">@drawable/bg_bottom_sheet</item>
+    </style>
+</resources>
+<!-- appended -->

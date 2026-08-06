@@ -1,0 +1,14 @@
+PHASE 9 — PUBLIC VERIFICATION PORTAL
+
+Changed Android files:
+- VerificationEngine.kt
+- MainViewModel.kt
+
+New zero-cost web portal:
+- docs/index.html
+- docs/styles.css
+- docs/app.js
+
+QR codes now open a public GitHub Pages verification URL and carry compact evidence fields in a Base64-URL payload. The receiver can scan the QR using any phone camera. The portal also attempts local QR extraction from a selected image when the browser supports BarcodeDetector.
+
+No photo is uploaded. Exact image-hash matching is intentionally not claimed until a public evidence registry exists.

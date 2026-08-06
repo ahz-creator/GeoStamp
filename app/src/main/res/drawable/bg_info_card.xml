@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Default static background for info_overlay.
+    CameraFragment.applyOverlayAlpha() overwrites this at runtime with
+    a GradientDrawable whose alpha tracks the slider (0.2–0.9).
+    This static fallback uses the 0.6 default: alpha=0x99, navy=(0A,10,23)
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#990A1023"/>
+    <corners android:radius="20dp"/>
+    <stroke android:width="1dp" android:color="#28FFFFFF"/>
+</shape>

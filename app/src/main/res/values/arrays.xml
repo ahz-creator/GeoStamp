@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="stamp_styles">
+        <item>Dark Band</item>
+        <item>Transparent Dark</item>
+        <item>Transparent Light</item>
+        <item>White Band</item>
+        <item>Neon Green</item>
+    </string-array>
+
+    <string-array name="font_sizes">
+        <item>Small (9sp)</item>
+        <item>Medium (12sp)</item>
+        <item>Large (15sp)</item>
+        <item>X-Large (18sp)</item>
+    </string-array>
+</resources>

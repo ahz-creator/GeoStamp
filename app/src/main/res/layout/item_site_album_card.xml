@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Premium site album card — enterprise telecom feel -->
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:layout_marginStart="10dp" android:layout_marginEnd="10dp"
+    android:layout_marginTop="6dp" android:layout_marginBottom="6dp"
+    app:cardCornerRadius="20dp"
+    app:cardBackgroundColor="#111C2E"
+    app:cardElevation="8dp"
+    app:cardMaxElevation="12dp">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Top edge accent line — cyan gradient -->
+        <View android:layout_width="match_parent" android:layout_height="2dp"
+            android:background="@drawable/bg_cyan_edge_line"/>
+
+        <!-- ── Card Header ────────────────────────────────────────────── -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="top"
+            android:paddingStart="12dp" android:paddingEnd="12dp"
+            android:paddingTop="12dp" android:paddingBottom="8dp">
+
+            <!-- Cover thumbnail — rounded -->
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/iv_album_cover"
+                android:layout_width="60dp" android:layout_height="60dp"
+                android:scaleType="centerCrop" android:background="#0A0F1C"
+                app:shapeAppearanceOverlay="@style/ShapeAppearance.Corner12"
+                android:contentDescription="Album cover"/>
+
+            <!-- Info column -->
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:orientation="vertical"
+                android:layout_marginStart="10dp" android:layout_marginTop="0dp">
+
+                <!-- Site ID — large, bold -->
+                <TextView android:id="@+id/tv_site_id_header"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="–" android:textColor="#F1F5F9"
+                    android:textSize="19sp" android:textStyle="bold"
+                    android:letterSpacing="0.01" android:lineSpacingExtra="0dp"/>
+
+                <!-- Operator · distance row -->
+                <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:layout_marginTop="2dp">
+                    <TextView android:id="@+id/tv_album_operator"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="–" android:textColor="#22D3EE"
+                        android:textSize="11sp" android:textStyle="bold"/>
+                    <TextView android:id="@+id/tv_album_distance"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="" android:textColor="#94A3B8"
+                        android:textSize="11sp" android:layout_marginStart="3dp"/>
+                </LinearLayout>
+
+                <!-- Photo count -->
+                <TextView android:id="@+id/tv_album_photo_count"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp" android:text="0 Photos"
+                    android:textColor="#7DD3FC" android:textSize="10sp" android:textStyle="bold"/>
+
+                <!-- Last visit — smaller, muted -->
+                <TextView android:id="@+id/tv_last_visit"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp" android:textColor="#64748B"
+                    android:textSize="9sp"/>
+            </LinearLayout>
+
+            <!-- Verification ring + share — right column -->
+            <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:orientation="vertical" android:gravity="center_horizontal"
+                android:layout_marginStart="8dp" android:layout_marginTop="0dp">
+
+                <!-- Glowing verification ring — 64dp prominent -->
+                <FrameLayout android:layout_width="66dp" android:layout_height="66dp"
+                    android:gravity="center">
+                    <!-- Soft glow halo behind ring -->
+                    <View android:layout_width="66dp" android:layout_height="66dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_ring_glow"/>
+                    <com.google.android.material.progressindicator.CircularProgressIndicator
+                        android:id="@+id/progress_verification"
+                        android:layout_width="62dp" android:layout_height="62dp"
+                        android:layout_gravity="center"
+                        app:trackThickness="5dp"
+                        app:trackColor="#0D1A2E"
+                        app:indicatorColor="#22C55E"
+                        app:indicatorSize="62dp"
+                        android:progress="0"/>
+                    <LinearLayout android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center" android:orientation="vertical">
+                        <TextView android:id="@+id/tv_verification_pct"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="0%" android:textColor="#FFFFFF"
+                            android:textSize="13sp" android:textStyle="bold"
+                            android:shadowColor="#FF22C55E"
+                            android:shadowDx="0" android:shadowDy="0" android:shadowRadius="8"/>
+                        <TextView android:id="@+id/tv_verification_label"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="HIGH TRUST" android:textColor="#94A3B8"
+                            android:textSize="7sp" android:textStyle="bold"/>
+                    </LinearLayout>
+                </FrameLayout>
+
+                <!-- Glassmorphism Share button -->
+                <LinearLayout android:id="@+id/btn_share_album"
+                    android:layout_width="wrap_content" android:layout_height="26dp"
+                    android:orientation="horizontal" android:gravity="center"
+                    android:paddingStart="12dp" android:paddingEnd="12dp"
+                    android:layout_marginTop="6dp"
+                    android:background="@drawable/bg_share_chip_glow"
+                    android:clickable="true" android:focusable="true">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="↑ Share" android:textColor="#22D3EE"
+                        android:textSize="9sp" android:textStyle="bold"/>
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ── Subtle separator ──────────────────────────────────────── -->
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:background="#0D1F35" android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"/>
+
+        <!-- ── Photo strip — horizontal scroll, larger thumbs ────────── -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_photo_strip"
+            android:layout_width="match_parent" android:layout_height="120dp"
+            android:orientation="horizontal" android:overScrollMode="never"
+            android:paddingStart="10dp" android:paddingEnd="10dp"
+            android:paddingTop="8dp" android:paddingBottom="8dp"
+            android:clipToPadding="false"/>
+
+        <!-- ── Footer: View all ──────────────────────────────────────── -->
+        <LinearLayout android:id="@+id/btn_view_all"
+            android:layout_width="match_parent" android:layout_height="36dp"
+            android:orientation="horizontal" android:gravity="center_vertical"
+            android:paddingStart="14dp" android:paddingEnd="14dp"
+            android:background="?attr/selectableItemBackground">
+            <TextView android:id="@+id/tv_view_all"
+                android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="View all 0 photos"
+                android:textColor="#22D3EE" android:textSize="11sp" android:textStyle="bold"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="›" android:textColor="#22D3EE" android:textSize="16sp"/>
+        </LinearLayout>
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

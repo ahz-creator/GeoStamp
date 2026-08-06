@@ -1,0 +1,51 @@
+GeoStamp Final Device Identity + Silent Integrity Patch
+
+Modified files only
+
+NEW
+1. app/src/main/java/com/axiominfratech/geostamp/verification/DeviceIdentityManager.kt
+
+MODIFIED
+2. app/src/main/java/com/axiominfratech/geostamp/verification/DeviceProfileCollector.kt
+3. app/src/main/java/com/axiominfratech/geostamp/ui/MainViewModel.kt
+4. app/src/main/java/com/axiominfratech/geostamp/verification/EvidenceRegistryOutbox.kt
+5. app/src/main/java/com/axiominfratech/geostamp/ui/MainActivity.kt
+
+IMPLEMENTED
+
+• One-time Device & Evidence Integrity consent.
+• No repeated user notification for routine device-identity matching.
+• GeoStamp Device Identity (GDI), derived from Android-scoped identity, app signing
+  certificate and phone brand/model/device environment.
+• Phone manufacturer, brand and model retained in evidence metadata.
+• Android Keystore ECDSA signing key generated automatically.
+• StrongBox requested first where available; TEE/software fallback supported.
+• Every sealed capture is signed using SHA256withECDSA.
+• Capture public key, key fingerprint, signature and signed payload retained.
+• Hardware-backed status/security level retained.
+• Public-safe registry record includes masked device identity and signature proof.
+• Internal previous capture-key fingerprint is retained silently if a key changes.
+• IMEI, IMSI and SIM serial are not accessed or fabricated.
+
+IMPORTANT LIMITATION
+
+A normal Play Store application cannot guarantee an identifier that changes only when
+the physical phone changes. GDI is the strongest Play-safe continuity identity and
+normally survives app updates, reboot, cache clearing and uninstall/reinstall when the
+same device/user and signing certificate remain. Factory reset, Android profile change,
+OS behavior or signing-key change can change it. GeoStamp records such changes silently
+for internal comparison instead of making an unsupported absolute claim.
+
+TEST
+
+1. Install/build and accept consent once.
+2. Capture one photo.
+3. Inspect .meta:
+   geoStampDeviceIdentity
+   deviceBrand / deviceHardwareModel
+   captureSignature
+   capturePublicKey
+   captureKeyFingerprint
+   captureKeyHardwareBacked
+4. Capture a second photo: GDI and key fingerprint should match.
+5. Update/reinstall the same signed build: GDI should normally remain the same.

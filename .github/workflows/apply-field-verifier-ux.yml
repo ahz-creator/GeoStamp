@@ -1,0 +1,266 @@
+name: Apply Field Staff and Verifier UX
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-field-verifier-ux.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply UX patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              s = p.read_text(encoding='utf-8')
+              if old not in s:
+                  raise SystemExit(f'Expected block not found in {path}: {old[:120]!r}')
+              p.write_text(s.replace(old, new, 1), encoding='utf-8')
+
+          gallery = 'app/src/main/java/com/axiominfratech/geostamp/ui/GalleryActivity.kt'
+          gallery_xml = 'app/src/main/res/layout/activity_gallery.xml'
+          album_xml = 'app/src/main/res/layout/item_site_album_card.xml'
+          verify = 'app/src/main/java/com/axiominfratech/geostamp/ui/VerifyEvidenceActivity.kt'
+
+          replace_once(gallery,
+          '''    private fun updateStats(photos: List<GeoPhoto>) {
+              val uniqueSites = photos.map { it.siteId }.filter { it.isNotBlank() }.toSet().size
+              val trusted = photos.count {
+                  it.gpsVerified && !it.locationIntegrityRisk && it.imageSha256.isNotBlank()
+              }
+              val pct = if (photos.isEmpty()) 0 else (trusted * 100) / photos.size
+              binding.tvPhotoPill.text    = "${photos.size} Photos"
+              binding.tvStatPhotos.text   = "${photos.size}"
+              binding.tvStatSites.text    = "$uniqueSites"
+              binding.tvStatVerified.text = "$pct%"
+          }''',
+          '''    private fun updateStats(photos: List<GeoPhoto>) {
+              val uniqueSites = photos.map { it.siteId }.filter { it.isNotBlank() }.toSet().size
+              val now = System.currentTimeMillis()
+              val todayCount = photos.count { now - it.dateMs < 86_400_000L }
+              binding.tvPhotoPill.text    = "${photos.size} Photos"
+              binding.tvStatPhotos.text   = "${photos.size}"
+              binding.tvStatSites.text    = "$uniqueSites"
+              binding.tvStatVerified.text = "$todayCount"
+          }''')
+
+          replace_once(gallery,
+          '''        // Verification circle
+              val pct = album.verifiedPct
+              // Animate ring filling in
+              h.progress.progress = 0
+              val ringAnim = ObjectAnimator.ofInt(h.progress, "progress", 0, pct)
+              ringAnim.duration = 700
+              ringAnim.startDelay = (pos * 40L).coerceAtMost(200) + 200
+              ringAnim.interpolator = DecelerateInterpolator()
+              ringAnim.start()
+              val verColor = when {
+                  pct >= 80 -> 0xFF22C55E.toInt()
+                  pct >= 50 -> 0xFFF59E0B.toInt()
+                  else      -> 0xFFEF4444.toInt()
+              }
+              h.progress.setIndicatorColor(verColor)
+              h.verifyPct.text = "$pct%"
+              h.verifyLabel.text = when {
+                  album.photos.any { it.locationIntegrityRisk } -> "REVIEW"
+                  pct >= 80 -> "HIGH TRUST"
+                  pct >= 50 -> "REVIEW"
+                  else -> "RISK"
+              }
+              // White text always readable; ring colour shows status via the ring itself
+              h.verifyPct.setTextColor(0xFFFFFFFF.toInt())
+              h.verifyPct.setShadowLayer(10f, 0f, 0f, verColor)   // glow matches ring colour
+          ''',
+          '''        // Field-staff operational circle: captures made today at this site.
+              val now = System.currentTimeMillis()
+              val todayCount = album.photos.count { now - it.dateMs < 86_400_000L }
+              h.progress.progress = 0
+              val ringTarget = if (todayCount > 0) 100 else 0
+              ObjectAnimator.ofInt(h.progress, "progress", 0, ringTarget).apply {
+                  duration = 500
+                  startDelay = (pos * 40L).coerceAtMost(200) + 150
+                  interpolator = DecelerateInterpolator()
+                  start()
+              }
+              val operationalColor = if (todayCount > 0) 0xFF22D3EE.toInt() else 0xFF475569.toInt()
+              h.progress.setIndicatorColor(operationalColor)
+              h.verifyPct.text = "$todayCount"
+              h.verifyLabel.text = "TODAY"
+              h.verifyPct.setTextColor(0xFFFFFFFF.toInt())
+              h.verifyPct.setShadowLayer(8f, 0f, 0f, operationalColor)
+          ''')
+
+          replace_once(gallery,
+          '''        cv.drawText("TRUST STATUS",  40f, y, subPaint); y += 18f
+              val verifiedColor = when {
+                  album.verifiedPct >= 80 -> 0xFF22C55E.toInt()
+                  album.verifiedPct >= 50 -> 0xFFF59E0B.toInt()
+                  else                    -> 0xFFEF4444.toInt()
+              }
+              cv.drawText("${album.verifiedPct}% (${album.photos.count { it.gpsVerified }}/${album.photos.size} photos)",
+                  40f, y, bodyPaint.apply { color = verifiedColor })
+          ''',
+          '''        cv.drawText("CAPTURE STATUS",  40f, y, subPaint); y += 18f
+              val registeredCount = album.photos.count {
+                  it.gpsVerified && !it.locationIntegrityRisk && it.imageSha256.isNotBlank()
+              }
+              val pendingCount = (album.photos.size - registeredCount).coerceAtLeast(0)
+              cv.drawText("$registeredCount registered · $pendingCount pending",
+                  40f, y, bodyPaint.apply { color = 0xFF22D3EE.toInt() })
+          ''')
+
+          replace_once(gallery,
+          '''        cv.drawText("History Trust:  ${latestHistory?.trustedHistoryPhotos ?: 0} trusted · ${latestHistory?.warningHistoryPhotos ?: 0} warning · ${latestHistory?.riskHistoryPhotos ?: 0} risk", 30f, y, bodyPaint); y += 18f
+          ''',
+          '''        cv.drawText("Visit History:  ${latestHistory?.photosInLast90Days ?: 0} photos across ${latestHistory?.visitSessionsLast90Days ?: 0} visits", 30f, y, bodyPaint); y += 18f
+          ''')
+
+          replace_once(gallery,
+          '''                appendLine("Trust score: ${album.verifiedPct}%")
+          ''',
+          '''                val registeredCount = album.photos.count { it.gpsVerified && !it.locationIntegrityRisk && it.imageSha256.isNotBlank() }
+                          appendLine("Capture status: $registeredCount registered · ${album.photos.size - registeredCount} pending")
+          ''')
+
+          replace_once(gallery,
+          '''                    appendLine("History: ${p.sameDayPriorPhotos} earlier today | ${p.photosInLast90Days} photos / ${p.visitSessionsLast90Days} visits in 90 days | ${p.trustedHistoryPhotos} trusted, ${p.warningHistoryPhotos} warning, ${p.riskHistoryPhotos} risk")
+          ''',
+          '''                    appendLine("History: ${p.sameDayPriorPhotos} earlier today | ${p.photosInLast90Days} photos / ${p.visitSessionsLast90Days} visits in 90 days")
+          ''')
+
+          replace_once(gallery_xml,
+          '''                android:text="TRUSTED" android:textColor="#334155"
+          ''',
+          '''                android:text="TODAY" android:textColor="#334155"
+          ''')
+          replace_once(gallery_xml,
+          '''                android:textColor="#22C55E" android:textSize="18sp" android:textStyle="bold"/>
+          ''',
+          '''                android:textColor="#22D3EE" android:textSize="18sp" android:textStyle="bold"/>
+          ''')
+
+          replace_once(album_xml,
+          '''                            android:text="HIGH TRUST" android:textColor="#94A3B8"
+          ''',
+          '''                            android:text="TODAY" android:textColor="#94A3B8"
+          ''')
+          replace_once(album_xml,
+          '''                        app:indicatorColor="#22C55E"
+          ''',
+          '''                        app:indicatorColor="#22D3EE"
+          ''')
+
+          replace_once(verify,
+          '''import com.axiominfratech.geostamp.verification.EvidenceTrustEngine
+          ''',
+          '''import com.axiominfratech.geostamp.verification.EvidenceTrustEngine
+          import com.axiominfratech.geostamp.verification.RegistryPublisher
+          ''')
+
+          replace_once(verify,
+          '''            if (id.isBlank()) showError("Enter a Verification ID.") else verifyById(id)
+          ''',
+          '''            if (id.isBlank()) showError("Enter an Evidence ID.") else verifyById(id)
+          ''')
+
+          start = verify
+          replace_once(verify,
+          '''    private fun fetchPublicRecord(id: String): JSONObject? {
+              val path = id.lowercase(Locale.US).replace(Regex("[^a-z0-9._-]"), "-")
+              val url = URL("https://raw.githubusercontent.com/ahz-creator/GeoStamp-Config/main/evidence/$path.json?ts=${System.currentTimeMillis()}")
+              return runCatching {
+                  val connection = (url.openConnection() as HttpURLConnection).apply {
+                      connectTimeout = 7000
+                      readTimeout = 7000
+                      requestMethod = "GET"
+                      useCaches = false
+                  }
+                  connection.inputStream.bufferedReader().use { JSONObject(it.readText()) }
+              }.getOrNull()
+          }
+          ''',
+          '''    private suspend fun fetchPublicRecord(id: String): JSONObject? =
+              RegistryPublisher.lookup(this, id)
+          ''')
+
+          replace_once(verify,
+          '''            registryBacked -> "This Verification ID is confirmed in the GeoStamp Public Registry."
+          ''',
+          '''            registryBacked -> "This Evidence ID is confirmed in the GeoStamp Public Registry."
+          ''')
+
+          replace_once(verify,
+          '''        binding.tvResultDetails.text = buildString {
+              append("Verification ID\\n$id\\n\\n")
+              append("Source\\n$source\\n\\n")
+              append("Operator / Location\\n$primary\\n\\n")
+              append("Site / Activity\\n$secondary\\n\\n")
+              append("Captured\\n$date\\n\\n")
+              append("Coordinates\\n$coordinates\\n\\n")
+              append("Accuracy\\n$accuracyText\\n\\n")
+              append("Location integrity\\n")
+              append(if (risk) "Risk indicator recorded" else "No mock-location indicator recorded")
+          }
+
+              val assessment = EvidenceTrustEngine.assess(record, registryBacked)
+              binding.tvConfidenceScore.text = "${assessment.score}%"
+              binding.tvConfidenceLevel.text = assessment.level
+              binding.confidenceProgress.progress = assessment.score
+              binding.tvTrustConclusion.text = assessment.conclusion
+              binding.tvTrustFindings.text = assessment.findings.joinToString("\\n")
+              binding.tvEvidenceTimeline.text = assessment.timeline.joinToString("\\n↓\\n")
+              binding.trustCard.visibility = View.VISIBLE
+              binding.timelineCard.visibility = View.VISIBLE
+              binding.resultCard.visibility = View.VISIBLE
+              binding.tvError.visibility = View.GONE
+          ''',
+          '''        binding.tvResultDetails.text = buildString {
+              append("Evidence ID\\n$id\\n\\n")
+              append("Captured\\n$date\\n\\n")
+              append("Operator / Location\\n$primary\\n\\n")
+              append("Site / Activity\\n$secondary\\n\\n")
+              append("Coordinates\\n$coordinates\\n\\n")
+              append("Accuracy\\n$accuracyText")
+              if (risk) append("\\n\\nReview required: location-integrity indicator recorded")
+          }
+
+              // Mobile verification is intentionally a fast result slip.
+              // Detailed trust, signature, hash and timeline findings remain in View Report.
+              binding.trustCard.visibility = View.GONE
+              binding.timelineCard.visibility = View.GONE
+              binding.resultCard.visibility = View.VISIBLE
+              binding.btnViewReport.visibility = View.VISIBLE
+              binding.tvError.visibility = View.GONE
+          ''')
+
+          replace_once(verify,
+          '''        binding.tvResultSummary.text = "No public evidence record was found for this Verification ID."
+              binding.tvResultDetails.text = "Verification ID\\n$id\\n\\nThis does not prove that the photo is fake. It means GeoStamp could not locate a public registry record for the supplied ID."
+          ''',
+          '''        binding.tvResultSummary.text = "No public evidence record was found for this Evidence ID."
+              binding.tvResultDetails.text = "Evidence ID\\n$id\\n\\nCheck the ID or scan the QR again. Record not found does not by itself prove that the photo is fake."
+          ''')
+
+          PY
+
+      - name: Commit patched UX
+        run: |
+          git config user.name 'GeoStamp Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add app/src/main/java/com/axiominfratech/geostamp/ui/GalleryActivity.kt \
+                  app/src/main/java/com/axiominfratech/geostamp/ui/VerifyEvidenceActivity.kt \
+                  app/src/main/res/layout/activity_gallery.xml \
+                  app/src/main/res/layout/item_site_album_card.xml
+          git commit -m 'Separate field staff gallery from verifier forensic UX'
+          git push

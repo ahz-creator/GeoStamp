@@ -1,15 +1,16 @@
 package com.axiominfratech.geostamp.ui
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
 import android.net.Uri
 import android.os.Bundle
 import android.util.Base64
 import android.view.View
 import android.view.inputmethod.InputMethodManager
-import android.content.Context
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
@@ -20,7 +21,6 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.axiominfratech.geostamp.databinding.ActivityVerifyEvidenceBinding
-import com.axiominfratech.geostamp.verification.EvidenceTrustEngine
 import com.axiominfratech.geostamp.verification.RegistryPublisher
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
@@ -31,8 +31,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -63,9 +61,7 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         binding.btnScanQr.setOnClickListener {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
                 startQrScanner()
-            } else {
-                requestCameraPermission.launch(Manifest.permission.CAMERA)
-            }
+            } else requestCameraPermission.launch(Manifest.permission.CAMERA)
         }
         binding.btnVerifyId.setOnClickListener {
             val id = binding.inputVerificationId.text?.toString()?.trim().orEmpty()
@@ -108,8 +104,7 @@ class VerifyEvidenceActivity : AppCompatActivity() {
 
     private fun analyzeQr(image: ImageProxy, reader: MultiFormatReader) {
         if (!decoding.compareAndSet(false, true)) {
-            image.close()
-            return
+            image.close(); return
         }
         try {
             val luminance = extractLuminance(image)
@@ -120,11 +115,8 @@ class VerifyEvidenceActivity : AppCompatActivity() {
             val result = reader.decodeWithState(BinaryBitmap(HybridBinarizer(source)))
             runOnUiThread { handleQrPayload(result.text) }
         } catch (_: Exception) {
-            reader.reset()
-            decoding.set(false)
-        } finally {
-            image.close()
-        }
+            reader.reset(); decoding.set(false)
+        } finally { image.close() }
     }
 
     private fun handleQrPayload(raw: String) {
@@ -133,31 +125,15 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         val uri = runCatching { Uri.parse(raw) }.getOrNull()
         val idFromUrl = uri?.getQueryParameter("id")
         val embedded = uri?.getQueryParameter("e")
-
         when {
-            !idFromUrl.isNullOrBlank() -> {
-                binding.inputVerificationId.setText(idFromUrl)
-                verifyById(idFromUrl)
-            }
+            !idFromUrl.isNullOrBlank() -> verifyById(idFromUrl)
             !embedded.isNullOrBlank() -> {
                 val record = decodeEmbeddedRecord(embedded)
-                if (record != null) {
-                    val embeddedId = record.optString("verificationId", record.optString("id"))
-                    if (embeddedId.isNotBlank()) {
-                        binding.inputVerificationId.setText(embeddedId)
-                        verifyEmbeddedAgainstRegistry(record, embeddedId)
-                    } else {
-                        currentReportUrl = embeddedReportUrl(record)
-                        showRecord(record, "Embedded GeoStamp QR record", false)
-                    }
-                } else {
-                    showError("The QR was detected but its evidence payload could not be read.")
-                }
+                val id = record?.optString("verificationId", record.optString("evidenceId"))
+                if (record != null && !id.isNullOrBlank()) verifyEmbeddedAgainstRegistry(record, id)
+                else showError("The GeoStamp QR payload could not be read.")
             }
-            raw.startsWith("GST-", true) -> {
-                binding.inputVerificationId.setText(raw)
-                verifyById(raw)
-            }
+            raw.startsWith("GST-", true) -> verifyById(raw)
             else -> showError("This QR is not a supported GeoStamp evidence code.")
         }
     }
@@ -165,19 +141,12 @@ class VerifyEvidenceActivity : AppCompatActivity() {
     private fun verifyEmbeddedAgainstRegistry(embeddedRecord: JSONObject, id: String) {
         clearMessages()
         binding.progress.visibility = View.VISIBLE
-        binding.resultCard.visibility = View.GONE
         currentVerificationId = id.uppercase(Locale.US)
-        currentReportUrl = "https://ahz-creator.github.io/GeoStamp-Portal/?id=${Uri.encode(currentVerificationId)}"
-
+        currentReportUrl = reportUrl(currentVerificationId.orEmpty())
         lifecycleScope.launch {
-            val publicRecord = withContext(Dispatchers.IO) { fetchPublicRecord(currentVerificationId.orEmpty()) }
+            val publicRecord = withContext(Dispatchers.IO) { RegistryPublisher.lookup(this@VerifyEvidenceActivity, currentVerificationId.orEmpty()) }
             binding.progress.visibility = View.GONE
-            if (publicRecord != null) {
-                showRecord(publicRecord, "Public registry record found", true)
-            } else {
-                currentReportUrl = embeddedReportUrl(embeddedRecord)
-                showRecord(embeddedRecord, "Embedded GeoStamp QR record", false)
-            }
+            showRecord(publicRecord ?: embeddedRecord, publicRecord != null)
         }
     }
 
@@ -188,89 +157,64 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         clearMessages()
         binding.progress.visibility = View.VISIBLE
         binding.resultCard.visibility = View.GONE
-
         val id = input.trim().uppercase(Locale.US)
+        binding.inputVerificationId.setText(id)
         currentVerificationId = id
-        currentReportUrl = "https://ahz-creator.github.io/GeoStamp-Portal/?id=${Uri.encode(id)}"
-
+        currentReportUrl = reportUrl(id)
         lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) { fetchPublicRecord(id) }
+            val result = withContext(Dispatchers.IO) { RegistryPublisher.lookup(this@VerifyEvidenceActivity, id) }
             binding.progress.visibility = View.GONE
-            if (result != null) showRecord(result, "Public registry record found", true)
-            else showNotRegistered(id)
+            if (result != null) showRecord(result, true) else showNotRegistered(id)
         }
     }
 
-    private suspend fun fetchPublicRecord(id: String): JSONObject? =
-        RegistryPublisher.lookup(this, id)
-
-    private fun showRecord(record: JSONObject, source: String, registryBacked: Boolean) {
+    private fun showRecord(record: JSONObject, registryBacked: Boolean) {
         val risk = record.optBoolean("locationRisk", false) ||
-            record.optBoolean("locationIntegrityRisk", false) ||
-            record.optInt("lr", 0) == 1
-        val status = when {
-            risk -> "REGISTERED — LOCATION RISK"
-            registryBacked -> "REGISTERED EVIDENCE"
+            record.optBoolean("locationIntegrityRisk", false) || record.optInt("lr", 0) == 1
+        binding.tvResultStatus.text = when {
+            risk -> "REGISTERED · REVIEW REQUIRED"
+            registryBacked -> "VERIFIED · REGISTERED"
             else -> "QR RECORD FOUND"
         }
-        binding.tvResultStatus.text = status
         binding.tvResultStatus.setTextColor(
-            ContextCompat.getColor(
-                this,
-                if (risk) android.R.color.holo_orange_light else android.R.color.holo_green_light
-            )
+            ContextCompat.getColor(this, if (risk) android.R.color.holo_orange_dark else android.R.color.holo_green_dark)
         )
         binding.tvResultSummary.text = when {
-            risk -> "A GeoStamp record was found, but the location-integrity signals require review."
-            registryBacked -> "This Evidence ID is confirmed in the GeoStamp Public Registry."
-            else -> "A structured GeoStamp evidence record was decoded from the QR. Public registration is not yet confirmed."
+            risk -> "Registry record found; location-integrity signals require review."
+            registryBacked -> "Evidence ID confirmed in the GeoStamp Public Registry."
+            else -> "Structured GeoStamp record decoded; public registration is not confirmed."
         }
 
-        val id = record.optString("verificationId", record.optString("id", currentVerificationId.orEmpty()))
+        val id = firstNonBlank(record.optString("evidenceId"), record.optString("verificationId"), record.optString("id"), currentVerificationId.orEmpty())
         currentVerificationId = id
-        if (registryBacked) {
-            currentReportUrl = "https://ahz-creator.github.io/GeoStamp-Portal/?id=${Uri.encode(id)}"
-        }
-        val capturedAt = record.optLong(
-            "capturedAt",
-            record.optLong("timestamp", record.optLong("ts", 0L))
-        )
-        val date = if (capturedAt > 0) {
-            SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date(capturedAt))
-        } else {
-            "Unavailable"
-        }
-        val primary = firstNonBlank(
-            record.optString("primaryValue"),
-            record.optString("operator"),
-            record.optString("p")
-        )
-        val secondary = firstNonBlank(
-            record.optString("secondaryValue"),
-            record.optString("siteId"),
-            record.optString("s")
-        )
+        currentReportUrl = reportUrl(id)
+        val capturedAt = record.optLong("capturedAt", record.optLong("timestamp", record.optLong("ts", 0L)))
+        val date = formatTime(capturedAt)
+        val primary = firstNonBlank(record.optString("primaryValue"), record.optString("operator"), record.optString("p"))
+        val secondary = firstNonBlank(record.optString("secondaryValue"), record.optString("siteId"), record.optString("s"))
         val lat = record.optDouble("latitude", record.optDouble("lat", Double.NaN))
         val lon = record.optDouble("longitude", record.optDouble("lon", Double.NaN))
-        val accuracy = record.optDouble(
-            "accuracyM",
-            record.optDouble("accuracy", record.optDouble("acc", Double.NaN))
-        )
+        val accuracy = record.optDouble("accuracyM", record.optDouble("accuracy", record.optDouble("acc", Double.NaN)))
         val coordinates = if (lat.isFinite() && lon.isFinite()) "%.6f, %.6f".format(Locale.US, lat, lon) else "Unavailable"
         val accuracyText = if (accuracy.isFinite()) "±%.1f m".format(Locale.US, accuracy) else "Unavailable"
+        val device = firstNonBlank(
+            listOf(record.optString("deviceManufacturer"), record.optString("deviceHardwareModel")).filter { it.isNotBlank() }.joinToString(" "),
+            record.optString("deviceModel"),
+            "Unavailable"
+        )
+        val maskedDevice = firstNonBlank(record.optString("maskedGeoStampDeviceIdentity"), "Unavailable")
 
         binding.tvResultDetails.text = buildString {
-            append("Evidence ID\n$id\n\n")
-            append("Captured\n$date\n\n")
-            append("Operator / Location\n$primary\n\n")
-            append("Site / Activity\n$secondary\n\n")
-            append("Coordinates\n$coordinates\n\n")
-            append("Accuracy\n$accuracyText")
-            if (risk) append("\n\nReview required: location-integrity indicator recorded")
+            append("EVIDENCE ID\n$id\n\n")
+            append("CAPTURED\n$date\n\n")
+            append("OPERATOR / PROJECT\n$primary\n\n")
+            append("SITE / REFERENCE\n$secondary\n\n")
+            append("LOCATION\n$coordinates  ·  $accuracyText\n\n")
+            append("DEVICE\n$device\n$maskedDevice")
         }
 
-        // Mobile verification is intentionally a fast result slip.
-        // Detailed trust, signature, hash and timeline findings remain in View Report.
+        renderThumbnail(record)
+        renderSessionActivity(record, capturedAt, secondary)
         binding.trustCard.visibility = View.GONE
         binding.timelineCard.visibility = View.GONE
         binding.resultCard.visibility = View.VISIBLE
@@ -278,14 +222,73 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         binding.tvError.visibility = View.GONE
     }
 
+    private fun renderThumbnail(record: JSONObject) {
+        val raw = firstNonBlank(
+            record.optString("thumbnailBase64"),
+            record.optString("thumbnailJpegBase64"),
+            record.optString("thumb")
+        ).substringAfter("base64,", "")
+        if (raw.isBlank()) {
+            binding.ivEvidenceThumbnail.visibility = View.GONE
+            binding.tvThumbnailUnavailable.visibility = View.VISIBLE
+            return
+        }
+        runCatching {
+            val bytes = Base64.decode(raw, Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        }.getOrNull()?.let { bitmap ->
+            binding.ivEvidenceThumbnail.setImageBitmap(bitmap)
+            binding.ivEvidenceThumbnail.visibility = View.VISIBLE
+            binding.tvThumbnailUnavailable.visibility = View.GONE
+        } ?: run {
+            binding.ivEvidenceThumbnail.visibility = View.GONE
+            binding.tvThumbnailUnavailable.visibility = View.VISIBLE
+        }
+    }
+
+    private fun renderSessionActivity(record: JSONObject, capturedAt: Long, siteId: String) {
+        val sessionId = record.optString("operatorSessionId")
+        val sessionStarted = record.optLong("operatorSessionStartedAt", 0L)
+        val beforeSite = record.optInt("sitePhotosBefore", record.optInt("photosBeforeAtSite", -1))
+        val afterSite = record.optInt("sitePhotosAfter", record.optInt("photosAfterAtSite", -1))
+        val totalSite = record.optInt("siteSessionPhotoTotal", record.optInt("sitePhotoTotal", -1))
+        val totalSession = record.optInt("operatorSessionPhotoTotal", record.optInt("sessionPhotoTotal", -1))
+        val sitesVisited = record.optInt("operatorSessionSitesVisited", record.optInt("sessionSitesVisited", -1))
+        val clockOutAt = record.optLong("operatorSessionClockOutAt", 0L)
+        val clockOutReason = record.optString("operatorSessionClockOutReason")
+        if (sessionId.isBlank() && sessionStarted <= 0L) {
+            binding.tvSessionActivity.visibility = View.GONE
+            return
+        }
+        binding.tvSessionActivity.text = buildString {
+            append("OPERATOR SESSION\n")
+            append("Clock-in: ${formatTime(sessionStarted)}\n")
+            append("Reference capture: ${formatTime(capturedAt)}\n")
+            if (siteId.isNotBlank()) append("Site: $siteId\n")
+            append("Photos before at this site: ${displayCount(beforeSite)}\n")
+            append("Photos after at this site: ${displayCount(afterSite)}\n")
+            append("Total at this site: ${displayCount(totalSite)}\n")
+            append("Operator-session total: ${displayCount(totalSession)}\n")
+            append("Sites visited: ${displayCount(sitesVisited)}")
+            if (clockOutAt > 0L || clockOutReason.isNotBlank()) {
+                append("\nClock-out: ${formatTime(clockOutAt)}")
+                if (clockOutReason.isNotBlank()) append("\nReason: $clockOutReason")
+            } else append("\nSession status: Active / final totals pending")
+        }
+        binding.tvSessionActivity.visibility = View.VISIBLE
+    }
+
+    private fun displayCount(value: Int): String = if (value >= 0) value.toString() else "Pending"
+
     private fun showNotRegistered(id: String) {
         binding.tvResultStatus.text = "NOT REGISTERED"
-        binding.tvResultStatus.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_light))
+        binding.tvResultStatus.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark))
         binding.tvResultSummary.text = "No public evidence record was found for this Evidence ID."
-        binding.tvResultDetails.text = "Evidence ID\n$id\n\nCheck the ID or scan the QR again. Record not found does not by itself prove that the photo is fake."
+        binding.tvResultDetails.text = "EVIDENCE ID\n$id\n\nCheck the ID or scan the QR again. A missing record does not by itself prove that the image is fake."
+        binding.ivEvidenceThumbnail.visibility = View.GONE
+        binding.tvThumbnailUnavailable.visibility = View.VISIBLE
+        binding.tvSessionActivity.visibility = View.GONE
         binding.resultCard.visibility = View.VISIBLE
-        binding.trustCard.visibility = View.GONE
-        binding.timelineCard.visibility = View.GONE
         binding.btnViewReport.visibility = View.GONE
         binding.tvError.visibility = View.GONE
     }
@@ -312,16 +315,13 @@ class VerifyEvidenceActivity : AppCompatActivity() {
             ?.hideSoftInputFromWindow(binding.inputVerificationId.windowToken, 0)
     }
 
-    private fun firstNonBlank(vararg values: String): String =
-        values.firstOrNull { it.isNotBlank() } ?: "Unavailable"
+    private fun reportUrl(id: String) = "https://ahz-creator.github.io/GeoStamp-Portal/?id=${Uri.encode(id)}"
 
-    private fun embeddedReportUrl(record: JSONObject): String {
-        val encoded = Base64.encodeToString(
-            record.toString().toByteArray(Charsets.UTF_8),
-            Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
-        )
-        return "https://ahz-creator.github.io/GeoStamp-Portal/?e=${Uri.encode(encoded)}"
-    }
+    private fun formatTime(value: Long): String = if (value > 0L) {
+        SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date(value))
+    } else "Unavailable"
+
+    private fun firstNonBlank(vararg values: String): String = values.firstOrNull { it.isNotBlank() } ?: ""
 
     private fun decodeEmbeddedRecord(encoded: String): JSONObject? = runCatching {
         val bytes = Base64.decode(encoded, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
@@ -347,17 +347,9 @@ class VerifyEvidenceActivity : AppCompatActivity() {
     }
 
     private fun rotateLuminance(data: ByteArray, width: Int, height: Int, rotation: Int): ByteArray = when (rotation) {
-        90 -> ByteArray(data.size).also { out ->
-            var i = 0
-            for (x in 0 until width) for (y in height - 1 downTo 0) out[i++] = data[y * width + x]
-        }
-        180 -> ByteArray(data.size).also { out ->
-            for (i in data.indices) out[i] = data[data.lastIndex - i]
-        }
-        270 -> ByteArray(data.size).also { out ->
-            var i = 0
-            for (x in width - 1 downTo 0) for (y in 0 until height) out[i++] = data[y * width + x]
-        }
+        90 -> ByteArray(data.size).also { out -> var i = 0; for (x in 0 until width) for (y in height - 1 downTo 0) out[i++] = data[y * width + x] }
+        180 -> ByteArray(data.size).also { out -> for (i in data.indices) out[i] = data[data.lastIndex - i] }
+        270 -> ByteArray(data.size).also { out -> var i = 0; for (x in width - 1 downTo 0) for (y in 0 until height) out[i++] = data[y * width + x] }
         else -> data
     }
 }

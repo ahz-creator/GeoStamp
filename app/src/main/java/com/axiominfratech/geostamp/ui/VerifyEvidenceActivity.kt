@@ -2,7 +2,6 @@ package com.axiominfratech.geostamp.ui
 
 import android.Manifest
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
@@ -11,6 +10,7 @@ import android.os.Bundle
 import android.util.Base64
 import android.view.View
 import android.view.inputmethod.InputMethodManager
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
@@ -21,6 +21,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.axiominfratech.geostamp.databinding.ActivityVerifyEvidenceBinding
+import com.axiominfratech.geostamp.verification.EvidencePdfExporter
 import com.axiominfratech.geostamp.verification.RegistryPublisher
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
@@ -44,7 +45,7 @@ class VerifyEvidenceActivity : AppCompatActivity() {
     private val decoding = AtomicBoolean(false)
     private var cameraProvider: ProcessCameraProvider? = null
     private var currentVerificationId: String? = null
-    private var currentReportUrl: String? = null
+    private var currentRecord: JSONObject? = null
 
     private val requestCameraPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -68,7 +69,21 @@ class VerifyEvidenceActivity : AppCompatActivity() {
             if (id.isBlank()) showError("Enter an Evidence ID.") else verifyById(id)
         }
         binding.btnViewReport.setOnClickListener {
-            currentReportUrl?.let { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) }
+            val record = currentRecord
+            if (record == null) {
+                Toast.makeText(this, "Verify an evidence record first.", Toast.LENGTH_SHORT).show()
+            } else {
+                binding.btnViewReport.isEnabled = false
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val result = EvidencePdfExporter.exportAndShare(this@VerifyEvidenceActivity, record)
+                    withContext(Dispatchers.Main) {
+                        binding.btnViewReport.isEnabled = true
+                        result.exceptionOrNull()?.let {
+                            Toast.makeText(this@VerifyEvidenceActivity, "PDF share failed: ${it.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -87,15 +102,11 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         providerFuture.addListener({
             val provider = providerFuture.get()
             cameraProvider = provider
-            val preview = Preview.Builder().build().also {
-                it.setSurfaceProvider(binding.scannerPreview.surfaceProvider)
-            }
+            val preview = Preview.Builder().build().also { it.setSurfaceProvider(binding.scannerPreview.surfaceProvider) }
             val analysis = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
-            val reader = MultiFormatReader().apply {
-                setHints(mapOf(DecodeHintType.TRY_HARDER to true))
-            }
+            val reader = MultiFormatReader().apply { setHints(mapOf(DecodeHintType.TRY_HARDER to true)) }
             analysis.setAnalyzer(analysisExecutor) { image -> analyzeQr(image, reader) }
             provider.unbindAll()
             provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
@@ -103,9 +114,7 @@ class VerifyEvidenceActivity : AppCompatActivity() {
     }
 
     private fun analyzeQr(image: ImageProxy, reader: MultiFormatReader) {
-        if (!decoding.compareAndSet(false, true)) {
-            image.close(); return
-        }
+        if (!decoding.compareAndSet(false, true)) { image.close(); return }
         try {
             val luminance = extractLuminance(image)
             val rotated = rotateLuminance(luminance, image.width, image.height, image.imageInfo.rotationDegrees)
@@ -142,9 +151,10 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         clearMessages()
         binding.progress.visibility = View.VISIBLE
         currentVerificationId = id.uppercase(Locale.US)
-        currentReportUrl = reportUrl(currentVerificationId.orEmpty())
         lifecycleScope.launch {
-            val publicRecord = withContext(Dispatchers.IO) { RegistryPublisher.lookup(this@VerifyEvidenceActivity, currentVerificationId.orEmpty()) }
+            val publicRecord = withContext(Dispatchers.IO) {
+                RegistryPublisher.lookup(this@VerifyEvidenceActivity, currentVerificationId.orEmpty())
+            }
             binding.progress.visibility = View.GONE
             showRecord(publicRecord ?: embeddedRecord, publicRecord != null)
         }
@@ -160,7 +170,6 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         val id = input.trim().uppercase(Locale.US)
         binding.inputVerificationId.setText(id)
         currentVerificationId = id
-        currentReportUrl = reportUrl(id)
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) { RegistryPublisher.lookup(this@VerifyEvidenceActivity, id) }
             binding.progress.visibility = View.GONE
@@ -169,6 +178,7 @@ class VerifyEvidenceActivity : AppCompatActivity() {
     }
 
     private fun showRecord(record: JSONObject, registryBacked: Boolean) {
+        currentRecord = record
         val risk = record.optBoolean("locationRisk", false) ||
             record.optBoolean("locationIntegrityRisk", false) || record.optInt("lr", 0) == 1
         binding.tvResultStatus.text = when {
@@ -182,21 +192,18 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         binding.tvResultSummary.text = when {
             risk -> "Registry record found; location-integrity signals require review."
             registryBacked -> "Evidence ID confirmed in the GeoStamp Public Registry."
-            else -> "Structured GeoStamp record decoded; public registration is not confirmed."
+            else -> "GeoStamp QR record decoded; public registration is not confirmed."
         }
 
         val id = firstNonBlank(record.optString("evidenceId"), record.optString("verificationId"), record.optString("id"), currentVerificationId.orEmpty())
         currentVerificationId = id
-        currentReportUrl = reportUrl(id)
         val capturedAt = record.optLong("capturedAt", record.optLong("timestamp", record.optLong("ts", 0L)))
-        val date = formatTime(capturedAt)
         val primary = firstNonBlank(record.optString("primaryValue"), record.optString("operator"), record.optString("p"))
         val secondary = firstNonBlank(record.optString("secondaryValue"), record.optString("siteId"), record.optString("s"))
         val lat = record.optDouble("latitude", record.optDouble("lat", Double.NaN))
         val lon = record.optDouble("longitude", record.optDouble("lon", Double.NaN))
         val accuracy = record.optDouble("accuracyM", record.optDouble("accuracy", record.optDouble("acc", Double.NaN)))
-        val coordinates = if (lat.isFinite() && lon.isFinite()) "%.6f, %.6f".format(Locale.US, lat, lon) else "Unavailable"
-        val accuracyText = if (accuracy.isFinite()) "±%.1f m".format(Locale.US, accuracy) else "Unavailable"
+        val location = if (lat.isFinite() && lon.isFinite()) "%.6f, %.6f · ±%.1f m".format(Locale.US, lat, lon, accuracy) else "Unavailable"
         val device = firstNonBlank(
             listOf(record.optString("deviceManufacturer"), record.optString("deviceHardwareModel")).filter { it.isNotBlank() }.joinToString(" "),
             record.optString("deviceModel"),
@@ -206,11 +213,11 @@ class VerifyEvidenceActivity : AppCompatActivity() {
 
         binding.tvResultDetails.text = buildString {
             append("EVIDENCE ID\n$id\n\n")
-            append("CAPTURED\n$date\n\n")
+            append("CAPTURED\n${formatTime(capturedAt)}\n\n")
             append("OPERATOR / PROJECT\n$primary\n\n")
             append("SITE / REFERENCE\n$secondary\n\n")
-            append("LOCATION\n$coordinates  ·  $accuracyText\n\n")
-            append("DEVICE\n$device\n$maskedDevice")
+            append("LOCATION\n$location\n\n")
+            append("DEVICE\n$device · $maskedDevice")
         }
 
         renderThumbnail(record)
@@ -219,6 +226,7 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         binding.timelineCard.visibility = View.GONE
         binding.resultCard.visibility = View.VISIBLE
         binding.btnViewReport.visibility = View.VISIBLE
+        binding.btnViewReport.text = "SHARE PDF REPORT"
         binding.tvError.visibility = View.GONE
     }
 
@@ -249,31 +257,21 @@ class VerifyEvidenceActivity : AppCompatActivity() {
     private fun renderSessionActivity(record: JSONObject, capturedAt: Long, siteId: String) {
         val sessionId = record.optString("operatorSessionId")
         val sessionStarted = record.optLong("operatorSessionStartedAt", 0L)
+        if (sessionId.isBlank() && sessionStarted <= 0L) {
+            binding.tvSessionActivity.visibility = View.GONE
+            return
+        }
         val beforeSite = record.optInt("sitePhotosBefore", record.optInt("photosBeforeAtSite", -1))
         val afterSite = record.optInt("sitePhotosAfter", record.optInt("photosAfterAtSite", -1))
         val totalSite = record.optInt("siteSessionPhotoTotal", record.optInt("sitePhotoTotal", -1))
         val totalSession = record.optInt("operatorSessionPhotoTotal", record.optInt("sessionPhotoTotal", -1))
         val sitesVisited = record.optInt("operatorSessionSitesVisited", record.optInt("sessionSitesVisited", -1))
-        val clockOutAt = record.optLong("operatorSessionClockOutAt", 0L)
-        val clockOutReason = record.optString("operatorSessionClockOutReason")
-        if (sessionId.isBlank() && sessionStarted <= 0L) {
-            binding.tvSessionActivity.visibility = View.GONE
-            return
-        }
         binding.tvSessionActivity.text = buildString {
-            append("OPERATOR SESSION\n")
+            append("SESSION ACTIVITY\n")
             append("Clock-in: ${formatTime(sessionStarted)}\n")
-            append("Reference capture: ${formatTime(capturedAt)}\n")
-            if (siteId.isNotBlank()) append("Site: $siteId\n")
-            append("Photos before at this site: ${displayCount(beforeSite)}\n")
-            append("Photos after at this site: ${displayCount(afterSite)}\n")
-            append("Total at this site: ${displayCount(totalSite)}\n")
-            append("Operator-session total: ${displayCount(totalSession)}\n")
-            append("Sites visited: ${displayCount(sitesVisited)}")
-            if (clockOutAt > 0L || clockOutReason.isNotBlank()) {
-                append("\nClock-out: ${formatTime(clockOutAt)}")
-                if (clockOutReason.isNotBlank()) append("\nReason: $clockOutReason")
-            } else append("\nSession status: Active / final totals pending")
+            append("Reference: ${formatTime(capturedAt)} · $siteId\n")
+            append("Before: ${displayCount(beforeSite)}   After: ${displayCount(afterSite)}   Site total: ${displayCount(totalSite)}\n")
+            append("Session total: ${displayCount(totalSession)}   Sites visited: ${displayCount(sitesVisited)}")
         }
         binding.tvSessionActivity.visibility = View.VISIBLE
     }
@@ -281,10 +279,11 @@ class VerifyEvidenceActivity : AppCompatActivity() {
     private fun displayCount(value: Int): String = if (value >= 0) value.toString() else "Pending"
 
     private fun showNotRegistered(id: String) {
+        currentRecord = null
         binding.tvResultStatus.text = "NOT REGISTERED"
         binding.tvResultStatus.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark))
         binding.tvResultSummary.text = "No public evidence record was found for this Evidence ID."
-        binding.tvResultDetails.text = "EVIDENCE ID\n$id\n\nCheck the ID or scan the QR again. A missing record does not by itself prove that the image is fake."
+        binding.tvResultDetails.text = "EVIDENCE ID\n$id\n\nCheck the ID or scan the QR again."
         binding.ivEvidenceThumbnail.visibility = View.GONE
         binding.tvThumbnailUnavailable.visibility = View.VISIBLE
         binding.tvSessionActivity.visibility = View.GONE
@@ -294,12 +293,14 @@ class VerifyEvidenceActivity : AppCompatActivity() {
     }
 
     private fun clearMessages() {
+        currentRecord = null
         decoding.set(false)
         binding.tvError.visibility = View.GONE
-        binding.btnViewReport.visibility = View.VISIBLE
+        binding.btnViewReport.visibility = View.GONE
     }
 
     private fun showError(message: String) {
+        currentRecord = null
         binding.progress.visibility = View.GONE
         binding.scannerContainer.visibility = View.GONE
         binding.resultCard.visibility = View.GONE
@@ -314,8 +315,6 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         (getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)
             ?.hideSoftInputFromWindow(binding.inputVerificationId.windowToken, 0)
     }
-
-    private fun reportUrl(id: String) = "https://ahz-creator.github.io/GeoStamp-Portal/?id=${Uri.encode(id)}"
 
     private fun formatTime(value: Long): String = if (value > 0L) {
         SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date(value))

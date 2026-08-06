@@ -322,14 +322,12 @@ class GalleryActivity : AppCompatActivity() {
 
     private fun updateStats(photos: List<GeoPhoto>) {
         val uniqueSites = photos.map { it.siteId }.filter { it.isNotBlank() }.toSet().size
-        val trusted = photos.count {
-            it.gpsVerified && !it.locationIntegrityRisk && it.imageSha256.isNotBlank()
-        }
-        val pct = if (photos.isEmpty()) 0 else (trusted * 100) / photos.size
+        val now = System.currentTimeMillis()
+        val todayCount = photos.count { now - it.dateMs < 86_400_000L }
         binding.tvPhotoPill.text    = "${photos.size} Photos"
         binding.tvStatPhotos.text   = "${photos.size}"
         binding.tvStatSites.text    = "$uniqueSites"
-        binding.tvStatVerified.text = "$pct%"
+        binding.tvStatVerified.text = "$todayCount"
     }
 
     // ── Album detail ──────────────────────────────────────────────────────────
@@ -576,14 +574,13 @@ class GalleryActivity : AppCompatActivity() {
         val dist = if (album.distanceM >= 1000) "%.1f km".format(album.distanceM / 1000)
                    else "%.0f m".format(album.distanceM)
         cv.drawText(dist.ifBlank { "–" }, 40f, y, bodyPaint); y += 30f
-        cv.drawText("TRUST STATUS",  40f, y, subPaint); y += 18f
-        val verifiedColor = when {
-            album.verifiedPct >= 80 -> 0xFF22C55E.toInt()
-            album.verifiedPct >= 50 -> 0xFFF59E0B.toInt()
-            else                    -> 0xFFEF4444.toInt()
+        cv.drawText("CAPTURE STATUS",  40f, y, subPaint); y += 18f
+        val registeredCount = album.photos.count {
+            it.gpsVerified && !it.locationIntegrityRisk && it.imageSha256.isNotBlank()
         }
-        cv.drawText("${album.verifiedPct}% (${album.photos.count { it.gpsVerified }}/${album.photos.size} photos)",
-            40f, y, bodyPaint.apply { color = verifiedColor })
+        val pendingCount = (album.photos.size - registeredCount).coerceAtLeast(0)
+        cv.drawText("$registeredCount registered · $pendingCount pending",
+            40f, y, bodyPaint.apply { color = 0xFF22D3EE.toInt() })
 
         // Stats summary
         y = 310f
@@ -595,7 +592,7 @@ class GalleryActivity : AppCompatActivity() {
         val latestHistory = album.photos.maxByOrNull { it.dateMs }
         cv.drawText("Earlier Today:  ${latestHistory?.sameDayPriorPhotos ?: 0} photos", 30f, y, bodyPaint); y += 18f
         cv.drawText("Last 90 Days:   ${latestHistory?.photosInLast90Days ?: 0} photos / ${latestHistory?.visitSessionsLast90Days ?: 0} visits", 30f, y, bodyPaint); y += 18f
-        cv.drawText("History Trust:  ${latestHistory?.trustedHistoryPhotos ?: 0} trusted · ${latestHistory?.warningHistoryPhotos ?: 0} warning · ${latestHistory?.riskHistoryPhotos ?: 0} risk", 30f, y, bodyPaint); y += 18f
+        cv.drawText("Visit History:  ${latestHistory?.photosInLast90Days ?: 0} photos across ${latestHistory?.visitSessionsLast90Days ?: 0} visits", 30f, y, bodyPaint); y += 18f
 
         // Footer
         cv.drawLine(0f, H - 40f, W.toFloat(), H - 40f, linePaint.apply { style = Paint.Style.FILL; color = 0xFF1E293B.toInt() })
@@ -677,13 +674,14 @@ class GalleryActivity : AppCompatActivity() {
                 appendLine("Site: ${album.siteId}")
                 appendLine("Operator: ${album.operator}")
                 appendLine("Photos: ${album.photos.size}")
-                appendLine("Trust score: ${album.verifiedPct}%")
+                val registeredCount = album.photos.count { it.gpsVerified && !it.locationIntegrityRisk && it.imageSha256.isNotBlank() }
+                appendLine("Capture status: $registeredCount registered · ${album.photos.size - registeredCount} pending")
                 appendLine("Generated: ${sdfFull.format(Date())}")
                 appendLine()
                 album.photos.forEach { p ->
                     appendLine("${p.name} | ${sdfFull.format(Date(p.dateMs))} | ${p.gpsLabel()} | ${p.verificationId} | %.4f %.4f".format(p.lat, p.lon))
                     if (p.imageSha256.isNotBlank()) appendLine("SHA-256: ${p.imageSha256}")
-                    appendLine("History: ${p.sameDayPriorPhotos} earlier today | ${p.photosInLast90Days} photos / ${p.visitSessionsLast90Days} visits in 90 days | ${p.trustedHistoryPhotos} trusted, ${p.warningHistoryPhotos} warning, ${p.riskHistoryPhotos} risk")
+                    appendLine("History: ${p.sameDayPriorPhotos} earlier today | ${p.photosInLast90Days} photos / ${p.visitSessionsLast90Days} visits in 90 days")
                 }
             }
             zos.putNextEntry(ZipEntry("evidence_manifest.txt"))
@@ -835,31 +833,23 @@ class SiteAlbumAdapter(
             }
         }
 
-        // Verification circle
-        val pct = album.verifiedPct
-        // Animate ring filling in
+        // Field-staff operational circle: captures made today at this site.
+        val now = System.currentTimeMillis()
+        val todayCount = album.photos.count { now - it.dateMs < 86_400_000L }
         h.progress.progress = 0
-        val ringAnim = ObjectAnimator.ofInt(h.progress, "progress", 0, pct)
-        ringAnim.duration = 700
-        ringAnim.startDelay = (pos * 40L).coerceAtMost(200) + 200
-        ringAnim.interpolator = DecelerateInterpolator()
-        ringAnim.start()
-        val verColor = when {
-            pct >= 80 -> 0xFF22C55E.toInt()
-            pct >= 50 -> 0xFFF59E0B.toInt()
-            else      -> 0xFFEF4444.toInt()
+        val ringTarget = if (todayCount > 0) 100 else 0
+        ObjectAnimator.ofInt(h.progress, "progress", 0, ringTarget).apply {
+            duration = 500
+            startDelay = (pos * 40L).coerceAtMost(200) + 150
+            interpolator = DecelerateInterpolator()
+            start()
         }
-        h.progress.setIndicatorColor(verColor)
-        h.verifyPct.text = "$pct%"
-        h.verifyLabel.text = when {
-            album.photos.any { it.locationIntegrityRisk } -> "REVIEW"
-            pct >= 80 -> "HIGH TRUST"
-            pct >= 50 -> "REVIEW"
-            else -> "RISK"
-        }
-        // White text always readable; ring colour shows status via the ring itself
+        val operationalColor = if (todayCount > 0) 0xFF22D3EE.toInt() else 0xFF475569.toInt()
+        h.progress.setIndicatorColor(operationalColor)
+        h.verifyPct.text = "$todayCount"
+        h.verifyLabel.text = "TODAY"
         h.verifyPct.setTextColor(0xFFFFFFFF.toInt())
-        h.verifyPct.setShadowLayer(10f, 0f, 0f, verColor)   // glow matches ring colour
+        h.verifyPct.setShadowLayer(8f, 0f, 0f, operationalColor)
 
         h.shareBtn.setOnClickListener {
             it.animate().scaleX(0.92f).scaleY(0.92f).setDuration(80).withEndAction {

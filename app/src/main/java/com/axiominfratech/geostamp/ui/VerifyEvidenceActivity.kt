@@ -21,6 +21,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.axiominfratech.geostamp.databinding.ActivityVerifyEvidenceBinding
 import com.axiominfratech.geostamp.verification.EvidenceTrustEngine
+import com.axiominfratech.geostamp.verification.RegistryPublisher
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
 import com.google.zxing.MultiFormatReader
@@ -68,7 +69,7 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         }
         binding.btnVerifyId.setOnClickListener {
             val id = binding.inputVerificationId.text?.toString()?.trim().orEmpty()
-            if (id.isBlank()) showError("Enter a Verification ID.") else verifyById(id)
+            if (id.isBlank()) showError("Enter an Evidence ID.") else verifyById(id)
         }
         binding.btnViewReport.setOnClickListener {
             currentReportUrl?.let { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) }
@@ -200,19 +201,8 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         }
     }
 
-    private fun fetchPublicRecord(id: String): JSONObject? {
-        val path = id.lowercase(Locale.US).replace(Regex("[^a-z0-9._-]"), "-")
-        val url = URL("https://raw.githubusercontent.com/ahz-creator/GeoStamp-Config/main/evidence/$path.json?ts=${System.currentTimeMillis()}")
-        return runCatching {
-            val connection = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 7000
-                readTimeout = 7000
-                requestMethod = "GET"
-                useCaches = false
-            }
-            connection.inputStream.bufferedReader().use { JSONObject(it.readText()) }
-        }.getOrNull()
-    }
+    private suspend fun fetchPublicRecord(id: String): JSONObject? =
+        RegistryPublisher.lookup(this, id)
 
     private fun showRecord(record: JSONObject, source: String, registryBacked: Boolean) {
         val risk = record.optBoolean("locationRisk", false) ||
@@ -232,7 +222,7 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         )
         binding.tvResultSummary.text = when {
             risk -> "A GeoStamp record was found, but the location-integrity signals require review."
-            registryBacked -> "This Verification ID is confirmed in the GeoStamp Public Registry."
+            registryBacked -> "This Evidence ID is confirmed in the GeoStamp Public Registry."
             else -> "A structured GeoStamp evidence record was decoded from the QR. Public registration is not yet confirmed."
         }
 
@@ -270,35 +260,29 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         val accuracyText = if (accuracy.isFinite()) "±%.1f m".format(Locale.US, accuracy) else "Unavailable"
 
         binding.tvResultDetails.text = buildString {
-            append("Verification ID\n$id\n\n")
-            append("Source\n$source\n\n")
+            append("Evidence ID\n$id\n\n")
+            append("Captured\n$date\n\n")
             append("Operator / Location\n$primary\n\n")
             append("Site / Activity\n$secondary\n\n")
-            append("Captured\n$date\n\n")
             append("Coordinates\n$coordinates\n\n")
-            append("Accuracy\n$accuracyText\n\n")
-            append("Location integrity\n")
-            append(if (risk) "Risk indicator recorded" else "No mock-location indicator recorded")
+            append("Accuracy\n$accuracyText")
+            if (risk) append("\n\nReview required: location-integrity indicator recorded")
         }
 
-        val assessment = EvidenceTrustEngine.assess(record, registryBacked)
-        binding.tvConfidenceScore.text = "${assessment.score}%"
-        binding.tvConfidenceLevel.text = assessment.level
-        binding.confidenceProgress.progress = assessment.score
-        binding.tvTrustConclusion.text = assessment.conclusion
-        binding.tvTrustFindings.text = assessment.findings.joinToString("\n")
-        binding.tvEvidenceTimeline.text = assessment.timeline.joinToString("\n↓\n")
-        binding.trustCard.visibility = View.VISIBLE
-        binding.timelineCard.visibility = View.VISIBLE
+        // Mobile verification is intentionally a fast result slip.
+        // Detailed trust, signature, hash and timeline findings remain in View Report.
+        binding.trustCard.visibility = View.GONE
+        binding.timelineCard.visibility = View.GONE
         binding.resultCard.visibility = View.VISIBLE
+        binding.btnViewReport.visibility = View.VISIBLE
         binding.tvError.visibility = View.GONE
     }
 
     private fun showNotRegistered(id: String) {
         binding.tvResultStatus.text = "NOT REGISTERED"
         binding.tvResultStatus.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_light))
-        binding.tvResultSummary.text = "No public evidence record was found for this Verification ID."
-        binding.tvResultDetails.text = "Verification ID\n$id\n\nThis does not prove that the photo is fake. It means GeoStamp could not locate a public registry record for the supplied ID."
+        binding.tvResultSummary.text = "No public evidence record was found for this Evidence ID."
+        binding.tvResultDetails.text = "Evidence ID\n$id\n\nCheck the ID or scan the QR again. Record not found does not by itself prove that the photo is fake."
         binding.resultCard.visibility = View.VISIBLE
         binding.trustCard.visibility = View.GONE
         binding.timelineCard.visibility = View.GONE

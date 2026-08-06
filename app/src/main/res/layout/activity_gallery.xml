@@ -194,9 +194,9 @@
             android:background="@drawable/bg_stat_card">
             <TextView android:id="@+id/tv_stat_verified" android:layout_width="wrap_content"
                 android:layout_height="wrap_content" android:text="0%"
-                android:textColor="#22C55E" android:textSize="18sp" android:textStyle="bold"/>
+                android:textColor="#22D3EE" android:textSize="18sp" android:textStyle="bold"/>
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="TRUSTED" android:textColor="#334155"
+                android:text="TODAY" android:textColor="#334155"
                 android:textSize="7sp" android:letterSpacing="0.14"/>
         </LinearLayout>
     </LinearLayout>

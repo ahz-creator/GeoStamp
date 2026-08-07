@@ -556,7 +556,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 } catch (_: Exception) {}
 
-                val saved = saveToGalleryInternal(stampedFile)
+                val saved = saveToGalleryInternal(stampedFile, operatorStr, siteIdStr, isPersonal)
                 if (saved) {
                     if (!isPersonal) {
                         operatorSessions.recordCapture(siteIdStr)
@@ -575,14 +575,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private suspend fun saveToGalleryInternal(file: File): Boolean = withContext(Dispatchers.IO) {
+    private suspend fun saveToGalleryInternal(
+        file: File,
+        operatorName: String,
+        siteId: String,
+        isPersonal: Boolean
+    ): Boolean = withContext(Dispatchers.IO) {
         try {
             val resolver = app.contentResolver
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val values = ContentValues().apply {
                     put(MediaStore.Images.Media.DISPLAY_NAME, file.name)
                     put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/GeoStamp")
+                    val safeOperator = operatorName.replace(Regex("[^A-Za-z0-9._ -]"), "_").trim().ifBlank { "Organization" }
+                    val safeSite = siteId.removePrefix("~").replace(Regex("[^A-Za-z0-9._ -]"), "_").trim().ifBlank { "Unassigned" }
+                    val relativeFolder = if (isPersonal)
+                        "Pictures/GeoStamp/Personal"
+                    else
+                        "Pictures/GeoStamp/$safeOperator/$safeSite"
+                    put(MediaStore.Images.Media.RELATIVE_PATH, relativeFolder)
                     put(MediaStore.Images.Media.IS_PENDING, 1)
                 }
                 val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
@@ -597,7 +608,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } else {
                 @Suppress("DEPRECATION")
                 val pics   = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-                val folder = File(pics, "GeoStamp")
+                val safeOperator = operatorName.replace(Regex("[^A-Za-z0-9._ -]"), "_").trim().ifBlank { "Organization" }
+                val safeSite = siteId.removePrefix("~").replace(Regex("[^A-Za-z0-9._ -]"), "_").trim().ifBlank { "Unassigned" }
+                val folder = if (isPersonal)
+                    File(pics, "GeoStamp/Personal")
+                else
+                    File(pics, "GeoStamp/$safeOperator/$safeSite")
                 if (!folder.exists() && !folder.mkdirs()) return@withContext false
                 val dest = File(folder, file.name)
                 file.copyTo(dest, overwrite = true)

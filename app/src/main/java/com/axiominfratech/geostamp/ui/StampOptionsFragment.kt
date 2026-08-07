@@ -38,11 +38,9 @@ class StampOptionsFragment : Fragment() {
 
         setupOperatorSpinner(emptyList())
 
-        // ── Radius slider ──────────────────────────────────────────────
-        binding.sliderRadius.addOnChangeListener { _, value, _ ->
-            binding.tvRadiusValue.text = "Radius: ${value.toInt()} m"
-            viewModel.updateStampConfig(viewModel.stampConfig.value.copy(matchRadiusM = value.toDouble()))
-        }
+        // Site radius is controlled remotely by the administrator.
+        binding.sliderRadius.isEnabled = false
+        binding.sliderRadius.alpha = 0.45f
 
         // ── Overlay alpha slider ───────────────────────────────────────
         binding.sliderOverlayAlpha.addOnChangeListener { _, value, _ ->
@@ -102,8 +100,9 @@ class StampOptionsFragment : Fragment() {
             viewModel.stampConfig.collect { config ->
 
                 // Radius
-                binding.sliderRadius.value = config.matchRadiusM.toFloat().coerceIn(5f, 3000f)
-                binding.tvRadiusValue.text = "Radius: ${config.matchRadiusM.toInt()} m"
+                val adminRadius = viewModel.remoteAppConfig.value.policy.siteDetectionRadiusM.toFloat().coerceIn(0f, 1000f)
+                binding.sliderRadius.value = adminRadius
+                binding.tvRadiusValue.text = "Admin: ${adminRadius.toInt()} m"
 
 
                 // Security

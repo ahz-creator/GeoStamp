@@ -210,7 +210,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _remoteAppConfig.value.activeOperators
 
     fun startOperatorSession(operator: RemoteConfigManager.OperatorConfig): Result<OperatorSessionManager.Session> = runCatching {
-        val session = operatorSessions.start(operator)
+        val session = operatorSessions.start(
+            operator,
+            _remoteAppConfig.value.policy.operatorInactivityTimeoutMinutes
+        )
         prefs.edit().putString("workspace_mode", "organization").apply()
         _uiState.update { it.copy(operatorSession = session, siteMatch = null) }
         recomputeSiteMatchForActiveSession()
@@ -230,6 +233,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val result = remoteConfig.sync()
             _remoteAppConfig.value = remoteConfig.loadCached()
+            _stampConfig.update { current ->
+                current.copy(matchRadiusM = _remoteAppConfig.value.policy.siteDetectionRadiusM)
+            }
             _uiState.update { it.copy(lastImportResult = result.message) }
             recomputeSiteMatchForActiveSession()
         }

@@ -132,8 +132,7 @@ class CameraFragment : Fragment() {
 
     private fun setupControls() {
         binding.btnCapture.setOnClickListener {
-            val secs = viewModel.uiState.value.timerSeconds
-            if (secs > 0) startTimerThenCapture(secs) else captureNow()
+            requestCaptureWithWorkspaceGuard()
         }
         binding.btnSwitchSide.setOnClickListener { openStampOptions() }
         binding.cardOperatorTap.setOnClickListener {
@@ -157,6 +156,62 @@ class CameraFragment : Fragment() {
                 else -> showWorkspacePicker()
             }
         }
+    }
+
+
+    private fun requestCaptureWithWorkspaceGuard() {
+        val mode = prefs.getString("workspace_mode", "organization") ?: "organization"
+        if (mode == "personal") {
+            continueCaptureAfterGuard()
+            return
+        }
+
+        val session = viewModel.activeOperatorSession()
+        if (session == null) {
+            Toast.makeText(requireContext(), "Clock in to an operator before organization capture", Toast.LENGTH_LONG).show()
+            showOperatorPicker()
+            return
+        }
+
+        val match = viewModel.uiState.value.siteMatch
+        val allowedRadius = viewModel.remoteAppConfig.value.policy.siteDetectionRadiusM
+        val validSiteLock = match?.site != null && match.distanceM <= allowedRadius
+
+        if (validSiteLock) {
+            continueCaptureAfterGuard()
+            return
+        }
+
+        val distanceText = match?.distanceM?.let {
+            if (it >= 1000.0) "%.1f km".format(Locale.ENGLISH, it / 1000.0)
+            else "%.0f m".format(Locale.ENGLISH, it)
+        } ?: "unknown"
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Outside organization site radius")
+            .setMessage(
+                "No valid ${session.operatorName} site is locked within ${allowedRadius.toInt()} m. " +
+                    "Nearest detected distance: $distanceText.\n\n" +
+                    "You may continue as Personal Evidence. The operator clock-in will remain active, " +
+                    "but this photo will not be added to any organization site folder or operator-session photo count."
+            )
+            .setPositiveButton("PERSONAL CAPTURE") { _, _ ->
+                prefs.edit()
+                    .putString("workspace_mode", "personal")
+                    .putString("personal_title", "Field Evidence")
+                    .putString("personal_reference", "Outside Site Radius")
+                    .apply()
+                applyWorkspaceUi()
+                Toast.makeText(requireContext(), "Personal capture mode active", Toast.LENGTH_SHORT).show()
+                continueCaptureAfterGuard()
+            }
+            .setNegativeButton("CANCEL", null)
+            .show()
+    }
+
+    private fun continueCaptureAfterGuard() {
+        val secs = viewModel.uiState.value.timerSeconds
+        if (secs > 0) startTimerThenCapture(secs) else captureNow()
     }
 
     private fun captureNow() {

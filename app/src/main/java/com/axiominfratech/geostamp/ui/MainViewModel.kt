@@ -31,6 +31,7 @@ import com.axiominfratech.geostamp.verification.DeviceProfileCollector
 import com.axiominfratech.geostamp.verification.DeviceIdentityManager
 import com.axiominfratech.geostamp.verification.EvidenceRegistryOutbox
 import com.axiominfratech.geostamp.verification.RegistryPublisher
+import com.axiominfratech.geostamp.verification.RegistrySyncManager
 import com.axiominfratech.geostamp.verification.EvidenceSlipMetadata
 import com.axiominfratech.geostamp.core.OperatorSessionManager
 import com.axiominfratech.geostamp.config.RemoteConfigManager
@@ -50,6 +51,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val prefs          = application.getSharedPreferences("geostamp_prefs", Context.MODE_PRIVATE)
     private val operatorSessions = OperatorSessionManager(application)
     private val remoteConfig = RemoteConfigManager(application, siteRepo)
+    private val registrySync = RegistrySyncManager(application)
     private val _remoteAppConfig = MutableStateFlow(remoteConfig.loadCached())
     val remoteAppConfig: StateFlow<RemoteConfigManager.AppConfig> = _remoteAppConfig.asStateFlow()
 
@@ -73,8 +75,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             while (isActive) {
-                _networkStatus.value = getNetworkType()
-                delay(10000)
+                val network = getNetworkType()
+                _networkStatus.value = network
+                if (network != "No Signal") {
+                    runCatching { registrySync.syncPending() }
+                }
+                delay(60_000)
             }
         }
     }
@@ -135,6 +141,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         loadDatabaseStats()
         loadDatasetOperators()
         syncRemoteConfiguration()
+        syncPendingRegistryRecords()
     }
 
     private fun runSecurityAudit() {
@@ -229,6 +236,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun activeOperatorSession(): OperatorSessionManager.Session? = operatorSessions.active()
+
+    fun pendingRegistryCount(): Int = registrySync.pendingCount()
+    fun registrySyncState(): String = registrySync.lastState()
+    fun registrySyncMessage(): String = registrySync.lastMessage()
+    fun registryLastSyncAt(): Long = registrySync.lastSyncAt()
+
+    fun syncPendingRegistryRecords() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { registrySync.syncPending() }
+        }
+    }
+
 
     fun operatorSessionCurrentSite(): String? = operatorSessions.currentSiteId()
     fun operatorSessionSiteVisitOrder(): List<String> = operatorSessions.siteVisitOrder()
@@ -532,14 +551,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     runCatching {
                         val queuedFile = EvidenceRegistryOutbox.enqueue(app, meta)
                         viewModelScope.launch(Dispatchers.IO) {
-                            val result = RegistryPublisher.publish(app, queuedFile)
-                            if (result.success) {
-                                EvidenceRegistryOutbox.publishFileSilently(
-                                    app,
-                                    queuedFile,
-                                    result.registryUrl
-                                )
-                            }
+                            registrySync.publishNow(queuedFile)
                         }
                     }
                 } catch (_: Exception) {}

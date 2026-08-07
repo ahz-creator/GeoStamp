@@ -506,7 +506,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         put("thumbnailSha256", thumbnailSha256)
                         put("visualEvidenceRequired", true)
                         put("aiVisualSummary", aiVisual.summary)
-                        put("aiVisualPurpose", aiVisual.purpose)
+                        put("aiObjectCountSummary", aiVisual.summary)
                         put("aiVisualSummaryStatus", aiVisual.status)
                         put("aiVisualSummaryProvider", aiVisual.provider)
                         val slipKeys = slipSession.keys()

@@ -45,7 +45,7 @@ object AiVisualSummaryClient {
                 put("operator", operator)
                 put("siteId", siteId)
                 put("capturedAt", capturedAt)
-                put("instruction", "Describe only visible, non-sensitive scene facts in 1-2 short sentences. Then state the likely field-documentation purpose in one short phrase. Do not identify people. Do not infer wrongdoing, ownership, safety compliance, or facts not visible in the image.")
+                put("instruction", "Identify only clearly visible object types and count each visible instance. Return a short comma-separated list in the form 'Object name: count'. Do not describe the scene, infer purpose, identify people, infer ownership, condition, compliance, activity, or any fact not directly visible. If an object cannot be counted reliably, omit it.")
             }
             val conn = URL(endpoint).openConnection() as HttpURLConnection
             conn.requestMethod = "POST"
@@ -62,7 +62,7 @@ object AiVisualSummaryClient {
             val json = JSONObject(body)
             Summary(
                 summary = json.optString("summary").trim().take(420),
-                purpose = json.optString("purpose").trim().take(180),
+                purpose = "",
                 status = if (json.optString("summary").isBlank()) "NO_RESULT" else "GENERATED",
                 provider = json.optString("provider", cfg.optString("provider"))
             )

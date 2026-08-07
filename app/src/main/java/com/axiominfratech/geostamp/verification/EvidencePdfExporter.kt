@@ -95,18 +95,15 @@ object EvidencePdfExporter {
 
         // AI summary: descriptive only
         var bandY = 340f
-        val ai = r.optString("aiVisualSummary").trim()
-        val purpose = first(r.optString("aiVisualPurpose"), r.optString("aiLikelyPurpose"), "").takeIf { it != "Unavailable" }.orEmpty().trim()
+        val ai = first(r.optString("aiObjectCountSummary"), r.optString("aiVisualSummary"), "").takeIf { it != "Unavailable" }.orEmpty().trim()
+        val purpose = ""
         if (ai.isNotBlank() || purpose.isNotBlank()) {
-            section(c,"AI VISUAL SUMMARY",M,bandY,green)
-            val summary = listOfNotNull(
-                ai.takeIf { it.isNotBlank() },
-                purpose.takeIf { it.isNotBlank() }?.let { "Likely documentation purpose: $it" }
-            ).joinToString("  ")
+            section(c,"AI OBJECT COUNT",M,bandY,green)
+            val summary = ai
             wrap(summary, 82).take(2).forEachIndexed { i,v ->
                 text(c,v,M,bandY+16+i*10,7.2f,Color.rgb(55,65,75),false)
             }
-            text(c,"AI description only · excluded from PASS/FAIL authentication",W-M,bandY+16,6.1f,Color.GRAY,false,Paint.Align.RIGHT)
+            text(c,"AI object detection/count only · excluded from PASS/FAIL authentication",W-M,bandY+16,6.1f,Color.GRAY,false,Paint.Align.RIGHT)
             bandY += 42f
         }
 

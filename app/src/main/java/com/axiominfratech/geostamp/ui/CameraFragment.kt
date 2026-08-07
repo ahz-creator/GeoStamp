@@ -711,11 +711,15 @@ class CameraFragment : Fragment() {
             return
         }
         val started = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.ENGLISH).format(Date(session.startedAt))
+        val visits = viewModel.operatorSessionSiteVisitOrder()
+        val currentSite = viewModel.operatorSessionCurrentSite()
         val message = buildString {
             appendLine("Active operator: ${session.operatorName}")
             appendLine("Started: $started")
             appendLine("Photos: ${session.photoCount}")
-            append("Sites: ${session.siteIds.size}")
+            appendLine("Current site: ${currentSite ?: "No site locked"}")
+            append("Sites visited: ")
+            append(if (visits.isEmpty()) "None" else visits.joinToString(" → "))
         }
         AlertDialog.Builder(requireContext())
             .setTitle("Operator Clock-In Active")

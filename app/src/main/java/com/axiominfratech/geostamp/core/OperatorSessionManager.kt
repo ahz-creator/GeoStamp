@@ -91,6 +91,9 @@ class OperatorSessionManager(context: Context) {
             .putInt(KEY_PHOTOS, 0)
             .putString(KEY_SITES, "[]")
             .putString(KEY_SITE_PHOTO_COUNTS, "{}")
+            .remove(KEY_CURRENT_SITE)
+            .putString(KEY_SITE_VISIT_ORDER, "[]")
+            .putString(KEY_SITE_FIRST_SEEN, "{}")
             .remove(KEY_LAST_CLOCK_OUT_REASON)
             .remove(KEY_LAST_CLOCK_OUT_AT)
             .apply()
@@ -124,9 +127,47 @@ class OperatorSessionManager(context: Context) {
             .remove(KEY_PHOTOS)
             .remove(KEY_SITES)
             .remove(KEY_SITE_PHOTO_COUNTS)
+            .remove(KEY_CURRENT_SITE)
+            .remove(KEY_SITE_VISIT_ORDER)
+            .remove(KEY_SITE_FIRST_SEEN)
             .apply()
         return current
     }
+
+    /**
+     * Updates the currently GPS-locked site while keeping the same operator session.
+     * A site is appended only once to the ordered visit history.
+     */
+    fun updateSiteLock(siteId: String?, now: Long = System.currentTimeMillis()): Boolean {
+        if (readWithoutExpiry() == null) return false
+        val clean = siteId?.trim()?.takeIf { it.isNotEmpty() && it != "–" }
+        val previous = prefs.getString(KEY_CURRENT_SITE, null)
+        if (previous == clean) return false
+
+        val order = jsonArrayToList(prefs.getString(KEY_SITE_VISIT_ORDER, "[]") ?: "[]").toMutableList()
+        val firstSeenRaw = prefs.getString(KEY_SITE_FIRST_SEEN, "{}") ?: "{}"
+        val firstSeen = runCatching { JSONObject(firstSeenRaw) }.getOrElse { JSONObject() }
+        if (clean != null && !order.contains(clean)) {
+            order += clean
+            firstSeen.put(clean, now)
+        }
+
+        prefs.edit()
+            .putString(KEY_CURRENT_SITE, clean)
+            .putString(KEY_SITE_VISIT_ORDER, JSONArray(order).toString())
+            .putString(KEY_SITE_FIRST_SEEN, firstSeen.toString())
+            .apply()
+        return true
+    }
+
+    fun currentSiteId(): String? = prefs.getString(KEY_CURRENT_SITE, null)
+
+    fun siteVisitOrder(): List<String> =
+        jsonArrayToList(prefs.getString(KEY_SITE_VISIT_ORDER, "[]") ?: "[]")
+
+    fun siteFirstSeenAt(siteId: String): Long = runCatching {
+        JSONObject(prefs.getString(KEY_SITE_FIRST_SEEN, "{}") ?: "{}").optLong(siteId, 0L)
+    }.getOrDefault(0L)
 
     /**
      * Records a successful capture and resets the four-hour inactivity timer.
@@ -215,6 +256,9 @@ class OperatorSessionManager(context: Context) {
         private const val KEY_PHOTOS = "operator_session_photo_count"
         private const val KEY_SITES = "operator_session_site_ids"
         private const val KEY_SITE_PHOTO_COUNTS = "operator_session_site_photo_counts"
+        private const val KEY_CURRENT_SITE = "operator_session_current_site"
+        private const val KEY_SITE_VISIT_ORDER = "operator_session_site_visit_order"
+        private const val KEY_SITE_FIRST_SEEN = "operator_session_site_first_seen"
         private const val KEY_LAST_CLOCK_OUT_REASON = "operator_last_clock_out_reason"
         private const val KEY_LAST_CLOCK_OUT_AT = "operator_last_clock_out_at"
     }

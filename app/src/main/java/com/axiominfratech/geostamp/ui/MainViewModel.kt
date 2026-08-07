@@ -161,6 +161,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         } else {
                             SiteRepository.SiteMatchResult(false, fallbackText = "Clock in to an operator")
                         }
+                        operatorSessions.updateSiteLock(match.site?.siteId)
                         _uiState.update {
                             it.copy(
                                 currentLocation = geo,
@@ -229,6 +230,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun activeOperatorSession(): OperatorSessionManager.Session? = operatorSessions.active()
 
+    fun operatorSessionCurrentSite(): String? = operatorSessions.currentSiteId()
+    fun operatorSessionSiteVisitOrder(): List<String> = operatorSessions.siteVisitOrder()
+    fun operatorSessionSiteFirstSeenAt(siteId: String): Long = operatorSessions.siteFirstSeenAt(siteId)
+
     fun syncRemoteConfiguration() {
         viewModelScope.launch {
             val result = remoteConfig.sync()
@@ -253,6 +258,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 session.aliases,
                 operator?.defaultRadiusM ?: 500.0
             )
+            operatorSessions.updateSiteLock(match.site?.siteId)
             _uiState.update { it.copy(siteMatch = match, operatorSession = operatorSessions.active()) }
         }
     }

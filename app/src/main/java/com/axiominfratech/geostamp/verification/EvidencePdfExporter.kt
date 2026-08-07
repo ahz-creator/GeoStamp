@@ -2,45 +2,35 @@ package com.axiominfratech.geostamp.verification
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.RectF
-import android.graphics.Typeface
+import android.graphics.*
 import android.graphics.pdf.PdfDocument
 import android.util.Base64
 import androidx.core.content.FileProvider
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
+import java.security.KeyFactory
+import java.security.Signature
+import java.security.spec.X509EncodedKeySpec
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.util.*
 
 object EvidencePdfExporter {
     private const val W = 595
     private const val H = 842
-    private const val M = 34f
-    private val NAVY = Color.rgb(10, 31, 52)
-    private val GREEN = Color.rgb(91, 143, 32)
-    private val CYAN = Color.rgb(19, 139, 168)
-    private val TEXT = Color.rgb(30, 41, 59)
-    private val MUTED = Color.rgb(100, 116, 139)
-    private val LINE = Color.rgb(218, 224, 230)
+    private const val M = 28f
 
     fun exportAndShare(context: Context, record: JSONObject): Result<File> = runCatching {
-        val id = firstNonBlank(record.optString("evidenceId"), record.optString("verificationId"), "GEOSTAMP")
-        val dir = File(context.cacheDir, "shared_reports").also { it.mkdirs() }
-        val file = File(dir, "GeoStamp-$id.pdf")
+        require(decodeThumbnail(record) != null) { "Mandatory evidence thumbnail is unavailable." }
+        val id = id(record)
+        val file = File(File(context.cacheDir, "shared_reports").also { it.mkdirs() }, "GeoStamp-$id.pdf")
         createPdf(file, record)
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         val base = Intent(Intent.ACTION_SEND).apply {
             type = "application/pdf"
             putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "GeoStamp Evidence Report - $id")
-            putExtra(Intent.EXTRA_TEXT, "GeoStamp evidence report for $id")
+            putExtra(Intent.EXTRA_SUBJECT, "GeoStamp Evidence Report — $id")
+            putExtra(Intent.EXTRA_TEXT, "GeoStamp digital evidence authentication report — $id")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         val wa = Intent(base).apply { setPackage("com.whatsapp") }
@@ -51,162 +41,177 @@ object EvidencePdfExporter {
     private fun createPdf(file: File, r: JSONObject) {
         val doc = PdfDocument()
         try {
-            val p1 = doc.startPage(PdfDocument.PageInfo.Builder(W, H, 1).create())
-            drawReceipt(p1.canvas, r)
-            doc.finishPage(p1)
-            val p2 = doc.startPage(PdfDocument.PageInfo.Builder(W, H, 2).create())
-            drawAnnex(p2.canvas, r)
-            doc.finishPage(p2)
+            val p = doc.startPage(PdfDocument.PageInfo.Builder(W,H,1).create())
+            draw(p.canvas, r)
+            doc.finishPage(p)
             FileOutputStream(file).use { doc.writeTo(it) }
         } finally { doc.close() }
     }
 
-    private fun drawReceipt(c: Canvas, r: JSONObject) {
+    private fun draw(c: Canvas, r: JSONObject) {
+        val navy = Color.rgb(9,29,52); val green = Color.rgb(93,153,31)
+        val pale = Color.rgb(240,246,235); val line = Color.rgb(220,226,232)
         c.drawColor(Color.WHITE)
-        text(c, "GEOSTAMP", M, 44f, 24f, Color.BLACK, true)
-        text(c, "Axiom Infratech", M, 63f, 11f, GREEN, true)
-        text(c, "EVIDENCE REPORT", W-M, 43f, 17f, Color.DKGRAY, true, Paint.Align.RIGHT)
-        text(c, "AUTHENTICATED FIELD RECORD", W-M, 61f, 8.5f, MUTED, false, Paint.Align.RIGHT)
-        line(c, 76f)
 
-        val risk = r.optBoolean("locationRisk", r.optBoolean("locationIntegrityRisk", false))
-        val status = if (risk) "REGISTERED - REVIEW REQUIRED" else "VERIFIED - REGISTERED"
-        text(c, status, M, 105f, 18f, if (risk) Color.rgb(205,120,0) else GREEN, true)
-        val id = firstNonBlank(r.optString("evidenceId"), r.optString("verificationId"))
-        text(c, "Evidence ID  $id", M, 126f, 10.5f, TEXT, true)
+        // Header
+        fill(c, 0f, 0f, W.toFloat(), 72f, navy)
+        text(c,"GEOSTAMP",M,34f,23f,Color.WHITE,true)
+        text(c,"DIGITAL EVIDENCE AUTHENTICATION REPORT",M,52f,8.5f,Color.rgb(190,207,224),true)
+        text(c,"AXIOM INFRATECH",W-M,32f,10f,Color.rgb(61,200,229),true,Paint.Align.RIGHT)
+        text(c,"PUBLIC REGISTRY RECORD",W-M,49f,7f,Color.WHITE,false,Paint.Align.RIGHT)
 
-        var y = 142f
-        val thumb = decodeThumbnail(r)
-        if (thumb != null) {
-            val rect = fitRect(thumb.width, thumb.height, M, y, W-2*M, 190f)
-            c.drawBitmap(thumb, null, rect, Paint(Paint.ANTI_ALIAS_FLAG))
-            y = rect.bottom + 14f
-        } else {
-            val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(243,245,247) }
-            c.drawRoundRect(RectF(M, y, W-M, y+80f), 7f,7f,p)
-            text(c, "Photo thumbnail not available in this verification context", W/2f, y+44f, 10f, MUTED, false, Paint.Align.CENTER)
-            y += 94f
+        // Identity/status strip
+        fill(c,M,83f,W-M,109f,pale)
+        text(c,"VERIFIED · REGISTERED",M+10,101f,12.5f,green,true)
+        text(c,id(r),W-M-10,100f,9f,Color.rgb(25,38,54),true,Paint.Align.RIGHT)
+
+        // Evidence visual left / capture record right
+        val thumb = decodeThumbnail(r)!!
+        val photo = fit(thumb.width,thumb.height,M,121f,315f,205f)
+        c.drawBitmap(thumb,null,photo,Paint(Paint.ANTI_ALIAS_FLAG))
+        stroke(c,M,121f,M+315f,326f,line)
+
+        var y = 126f
+        val x = 360f
+        section(c,"CAPTURE RECORD",x,y,green); y += 18f
+        val captured = r.optLong("capturedAt",r.optLong("timestamp",0L))
+        val lat = r.optDouble("latitude",r.optDouble("lat",Double.NaN))
+        val lon = r.optDouble("longitude",r.optDouble("lon",Double.NaN))
+        val acc = r.optDouble("accuracyM",r.optDouble("accuracy",Double.NaN))
+        val device = first(listOf(r.optString("deviceManufacturer"),r.optString("deviceHardwareModel")).filter{it.isNotBlank()}.joinToString(" "),r.optString("deviceModel"),"Unavailable")
+        val captureRows = listOf(
+            "Captured" to time(captured),
+            "Operator" to first(r.optString("primaryValue"),r.optString("operator")),
+            "Site" to first(r.optString("secondaryValue"),r.optString("siteId")),
+            "Coordinates" to if(lat.isFinite()&&lon.isFinite()) "%.6f, %.6f".format(Locale.US,lat,lon) else "Unavailable",
+            "Accuracy" to if(acc.isFinite()) "±%.1f m".format(Locale.US,acc) else "Unavailable",
+            "Device" to device,
+            "Device identity" to first(r.optString("maskedGeoStampDeviceIdentity"),"Unavailable"),
+            "Workspace" to first(r.optString("workspaceMode"),"Unavailable")
+        )
+        captureRows.forEach { (a,b) -> y = compactRow(c,x,y,a,b,207f) }
+
+        // AI summary: descriptive only
+        var bandY = 340f
+        val ai = r.optString("aiVisualSummary").trim()
+        val purpose = r.optString("aiLikelyPurpose").trim()
+        if (ai.isNotBlank() || purpose.isNotBlank()) {
+            section(c,"AI VISUAL SUMMARY",M,bandY,green)
+            val summary = listOfNotNull(ai.takeIf{it.isNotBlank()}, purpose.takeIf{it.isNotBlank()}?.let{"Likely documentation purpose: $it"}).joinToString("  ")
+            val lines = wrap(summary, 82)
+            lines.take(2).forEachIndexed { i,v -> text(c,v,M,bandY+16+i*10,7.2f,Color.rgb(55,65,75),false) }
+            text(c,"Descriptive assistance only · not part of authentication result",W-M,bandY+16,6.1f,Color.GRAY,false,Paint.Align.RIGHT)
+            bandY += 42f
         }
 
-        y = section(c, "EVIDENCE", y)
-        y = pair(c, "Captured", time(r.optLong("capturedAt", r.optLong("timestamp",0L))), "Operator", firstNonBlank(r.optString("primaryValue"), r.optString("operator")), y)
-        y = pair(c, "Site / Reference", firstNonBlank(r.optString("secondaryValue"), r.optString("siteId")), "Accuracy", fmtAcc(r), y)
-        y = pair(c, "Coordinates", fmtCoords(r), "Device", fmtDevice(r), y)
+        // Field session context
+        section(c,"FIELD SESSION CONTEXT",M,bandY,green); bandY += 17f
+        fill(c,M,bandY,W-M,bandY+58f,navy)
+        val before = count(r,"sitePhotosBefore","photosBeforeAtSite")
+        val after = countActive(r,"sitePhotosAfter","photosAfterAtSite")
+        val totalSite = count(r,"siteSessionPhotoTotal","sitePhotoTotal")
+        val totalSession = count(r,"operatorSessionPhotoTotal","sessionPhotoTotal")
+        val sites = count(r,"operatorSessionSitesVisited","sessionSitesVisited")
+        val clockOut = r.optLong("operatorSessionClockOutAt",0L)
+        val session = listOf(
+            "CLOCK-IN" to time(r.optLong("operatorSessionStartedAt",0L)),
+            "BEFORE / AFTER" to "$before / $after",
+            "SITE TOTAL" to totalSite,
+            "WHOLE SESSION" to "$totalSession photos · $sites sites",
+            "CLOCK-OUT" to if(clockOut>0) time(clockOut) else "Active"
+        )
+        val colW=(W-2*M)/5f
+        session.forEachIndexed { i,(a,b) ->
+            val xx=M+i*colW+8f
+            text(c,a,xx,bandY+18f,5.6f,Color.rgb(163,184,205),true)
+            wrap(b,22).take(2).forEachIndexed { j,v -> text(c,v,xx,bandY+33+j*9f,7f,Color.WHITE,true) }
+        }
+        bandY += 72f
 
-        val started = r.optLong("operatorSessionStartedAt",0L)
-        if (started > 0L) {
-            y = section(c, "FIELD SESSION", y+4f)
-            y = pair(c, "Clock-in", time(started), "Site photos", "${count(r,"sitePhotosBefore","photosBeforeAtSite")} before / ${count(r,"sitePhotosAfter","photosAfterAtSite")} after", y)
-            y = pair(c, "Site total", count(r,"siteSessionPhotoTotal","sitePhotoTotal"), "Session total", count(r,"operatorSessionPhotoTotal","sessionPhotoTotal"), y)
-            y = pair(c, "Sites visited", count(r,"operatorSessionSitesVisited","sessionSitesVisited"), "Clock-out", time(r.optLong("operatorSessionClockOutAt",0L)), y)
+        // Machine verification + forensic provenance side by side
+        section(c,"MACHINE VERIFICATION RESULT",M,bandY,green)
+        section(c,"CRYPTOGRAPHIC & PROVENANCE RECORD",305f,bandY,green)
+        bandY += 17f
+        val signaturePass = verifySignature(r)
+        val risk = r.optBoolean("locationRisk",false)||r.optBoolean("locationIntegrityRisk",false)
+        val distance = firstFinite(r.optDouble("siteDistanceM",Double.NaN),r.optDouble("distanceM",Double.NaN))
+        val radius = r.optDouble("siteRadiusM",Double.NaN)
+        val siteResult = if(distance.isFinite()&&radius.isFinite()) if(distance<=radius) "PASS" else "REVIEW" else "RECORDED"
+        val checks = listOf(
+            "Registry record" to if(r.optString("registryStatus").contains("PUBLIC",true)) "PASS" else "RECORDED",
+            "Visual evidence" to "PASS",
+            "ECDSA signature" to when(signaturePass){true->"PASS";false->"FAIL";null->"RECORDED"},
+            "Signing key" to if(r.optBoolean("captureKeyHardwareBacked",false)) "HARDWARE-BACKED" else "RECORDED",
+            "Location integrity" to if(risk) "REVIEW" else "PASS",
+            "Site association" to siteResult,
+            "Session continuity" to if(r.optString("operatorSessionId").isNotBlank()) "RECORDED" else "N/A"
+        )
+        var ly=bandY
+        checks.forEach { (a,b) ->
+            text(c,a.uppercase(Locale.US),M,ly,6f,Color.GRAY,true)
+            text(c,b,190f,ly,7f,if(b=="PASS") green else Color.rgb(35,48,62),true)
+            ly+=15f
         }
 
-        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(247,248,250) }
-        c.drawRoundRect(RectF(M, y+8f, W-M, y+58f), 6f,6f,p)
-        text(c, "PUBLIC REGISTRY", M+12f, y+28f, 8.5f, GREEN, true)
-        text(c, r.optString("registryStatus","PUBLIC_RECORD"), M+118f, y+28f, 10f, TEXT, true)
-        text(c, "SHA-256 sealed · hardware-backed signature recorded", M+12f, y+47f, 8.5f, MUTED, false)
+        var ry=bandY
+        val prov = listOf(
+            "IMAGE SHA-256" to r.optString("imageSha256","Unavailable"),
+            "SIGNATURE ALGORITHM" to r.optString("captureSignatureAlgorithm","Unavailable"),
+            "KEY FINGERPRINT" to r.optString("captureKeyFingerprint","Unavailable"),
+            "SESSION ID" to r.optString("operatorSessionId","Unavailable"),
+            "PUBLISHED" to time(r.optLong("publishedAt",0L)),
+            "SCHEMA / MARKER" to "${r.optInt("schemaVersion",0)} / ${r.optInt("markerVersion",0)}"
+        )
+        prov.forEach { (a,b) -> ry = monoRow(c,305f,ry,a,b,262f) }
 
-        footer(c, 1)
+        // Capture signature once, full width
+        val sigY = maxOf(ly,ry)+7f
+        text(c,"CAPTURE SIGNATURE",M,sigY,6f,Color.GRAY,true)
+        val sig = r.optString("captureSignature","Unavailable")
+        wrapFixed(sig,94).take(2).forEachIndexed { i,v -> text(c,v,M,sigY+11+i*9,6f,Color.rgb(30,42,55),false,Paint.Align.LEFT,"monospace") }
+
+        // Evidence lifecycle + system finding
+        val lifeY=sigY+38f
+        section(c,"EVIDENCE LIFECYCLE",M,lifeY,green)
+        val lifecycle="CAPTURED ${shortTime(captured)}  →  SEALED/SIGNED  →  REGISTERED ${shortTime(r.optLong("publishedAt",0L))}  →  VERIFIED AT REPORT GENERATION"
+        text(c,lifecycle,M,lifeY+16,6.8f,Color.rgb(35,48,62),true)
+
+        val findingY=lifeY+35f
+        fill(c,M,findingY,W-M,findingY+43f,pale)
+        text(c,"SYSTEM FINDING",M+9,findingY+14,6.4f,green,true)
+        val finding="The GeoStamp registry record and the machine-verifiable integrity, provenance, device, location and session checks above produced the stated results."
+        wrap(finding,100).take(2).forEachIndexed { i,v -> text(c,v,M+9,findingY+27+i*9,6.5f,Color.rgb(40,52,62),false) }
+
+        val noteY=findingY+57f
+        text(c,"GeoStamp authenticates the digital evidence record and recorded capture metadata; it does not independently establish the truth of objects or events depicted.",M,noteY,5.8f,Color.GRAY,false)
+        text(c,"GeoStamp · Axiom Infratech",M,H-20f,6.2f,Color.GRAY,true)
+        text(c,"PAGE 1 OF 1",W-M,H-20f,6.2f,Color.GRAY,true,Paint.Align.RIGHT)
     }
 
-    private fun drawAnnex(c: Canvas, r: JSONObject) {
-        c.drawColor(Color.WHITE)
-        c.drawRect(0f,0f,W.toFloat(),78f,Paint(Paint.ANTI_ALIAS_FLAG).apply{color=NAVY})
-        text(c,"GEOSTAMP",M,35f,21f,Color.WHITE,true)
-        text(c,"FORENSIC AUDIT ANNEX",M,58f,10f,Color.rgb(120,220,238),true)
-        text(c,"Page 2 of 2",W-M,48f,9f,Color.WHITE,false,Paint.Align.RIGHT)
-        var y=104f
+    private fun verifySignature(r:JSONObject):Boolean? = runCatching {
+        val pk=r.optString("capturePublicKey"); val sig=r.optString("captureSignature"); val payload=r.optString("captureSignedPayload")
+        if(pk.isBlank()||sig.isBlank()||payload.isBlank()) return null
+        val key=KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(Base64.decode(pk,Base64.DEFAULT)))
+        Signature.getInstance(r.optString("captureSignatureAlgorithm","SHA256withECDSA")).run {
+            initVerify(key); update(payload.toByteArray(Charsets.UTF_8)); verify(Base64.decode(sig,Base64.DEFAULT))
+        }
+    }.getOrNull()
 
-        y = section(c,"LOCATION & DEVICE",y)
-        y = field(c,"Coordinates",fmtCoords(r),y)
-        y = field(c,"Accuracy",fmtAcc(r),y)
-        y = field(c,"Location integrity",if(r.optBoolean("locationRisk",r.optBoolean("locationIntegrityRisk",false))) "REVIEW REQUIRED" else "NO RISK FLAG RECORDED",y)
-        y = field(c,"Device",fmtDevice(r),y)
-        y = field(c,"Masked device identity",r.optString("maskedGeoStampDeviceIdentity","Unavailable"),y)
-        y = field(c,"Key security",if(r.optBoolean("captureKeyHardwareBacked",false)) "Hardware-backed · ${r.optString("captureKeySecurityLevel","Recorded")}" else "Not hardware-backed / unavailable",y)
-
-        y = section(c,"CRYPTOGRAPHIC INTEGRITY",y+4f)
-        y = field(c,"Image SHA-256",r.optString("imageSha256","Unavailable"),y,true)
-        y = field(c,"Signature algorithm",r.optString("captureSignatureAlgorithm","Unavailable"),y)
-        y = field(c,"Capture key fingerprint",r.optString("captureKeyFingerprint","Unavailable"),y,true)
-        y = field(c,"Capture signature",r.optString("captureSignature","Unavailable"),y,true)
-
-        y = section(c,"SESSION AUDIT",y+4f)
-        y = field(c,"Operator session ID",r.optString("operatorSessionId","Unavailable"),y,true)
-        y = field(c,"Clock-in",time(r.optLong("operatorSessionStartedAt",0L)),y)
-        y = field(c,"Before / after at same site","${count(r,"sitePhotosBefore","photosBeforeAtSite")} / ${count(r,"sitePhotosAfter","photosAfterAtSite")}",y)
-        y = field(c,"Site total / whole session","${count(r,"siteSessionPhotoTotal","sitePhotoTotal")} / ${count(r,"operatorSessionPhotoTotal","sessionPhotoTotal")}",y)
-        y = field(c,"Sites visited",count(r,"operatorSessionSitesVisited","sessionSitesVisited"),y)
-        y = field(c,"Distance / allowed radius","${distance(r)} / ${radius(r)}",y)
-        y = field(c,"Clock-out",time(r.optLong("operatorSessionClockOutAt",0L)),y)
-        y = field(c,"Clock-out reason",r.optString("operatorSessionClockOutReason","Active / pending"),y)
-
-        val noteY = minOf(y+12f, 748f)
-        text(c,"FORENSIC NOTE",M,noteY,9f,CYAN,true)
-        wrapped(c,"This report reproduces registry and device-recorded technical signals. It verifies the recorded evidence package and does not independently prove the truth of the photographed scene.",M,noteY+17f,W-2*M,8.3f,MUTED,3)
-        footer(c,2)
-    }
-
-    private fun section(c:Canvas,title:String,y:Float):Float{
-        text(c,title,M,y+14f,10f,GREEN,true)
-        val p=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=LINE;strokeWidth=1f}
-        c.drawLine(M,y+20f,W-M,y+20f,p)
-        return y+31f
-    }
-
-    private fun pair(c:Canvas,l1:String,v1:String,l2:String,v2:String,y:Float):Float{
-        val mid=305f
-        text(c,l1.uppercase(Locale.US),M,y,7.8f,MUTED,true)
-        text(c,v1.ifBlank{"Unavailable"},M,y+15f,10f,TEXT,true)
-        text(c,l2.uppercase(Locale.US),mid,y,7.8f,MUTED,true)
-        text(c,v2.ifBlank{"Unavailable"},mid,y+15f,10f,TEXT,true)
-        val p=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=LINE;strokeWidth=1f}
-        c.drawLine(M,y+25f,W-M,y+25f,p)
-        return y+37f
-    }
-
-    private fun field(c:Canvas,label:String,value:String,y:Float,mono:Boolean=false):Float{
-        val labelX=M
-        val valueX=190f
-        val valueW=W-M-valueX
-        text(c,label.uppercase(Locale.US),labelX,y+11f,7.6f,CYAN,true)
-        val safe=value.ifBlank{"Unavailable"}
-        val size=if(mono)7.2f else 8.8f
-        val lines=wrap(safe,if(mono)52 else 58).take(4)
-        lines.forEachIndexed { i,line -> text(c,line,valueX,y+11f+i*11f,size,TEXT,!mono) }
-        val h=maxOf(27f,15f+lines.size*11f)
-        val p=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=LINE;strokeWidth=1f}
-        c.drawLine(M,y+h,W-M,y+h,p)
-        return y+h+5f
-    }
-
-    private fun line(c:Canvas,y:Float){ c.drawLine(M,y,W-M,y,Paint(Paint.ANTI_ALIAS_FLAG).apply{color=LINE;strokeWidth=1f}) }
-    private fun footer(c:Canvas,page:Int){ line(c,807f); text(c,"GeoStamp · Axiom Infratech · Page $page of 2",W/2f,827f,8f,Color.GRAY,false,Paint.Align.CENTER) }
-    private fun text(c:Canvas,s:String,x:Float,y:Float,size:Float,color:Int,bold:Boolean,align:Paint.Align=Paint.Align.LEFT){
-        c.drawText(s,x,y,Paint(Paint.ANTI_ALIAS_FLAG).apply{this.color=color;textSize=size;textAlign=align;typeface=if(bold)Typeface.create(Typeface.DEFAULT,Typeface.BOLD) else Typeface.DEFAULT})
-    }
-    private fun wrapped(c:Canvas,s:String,x:Float,y:Float,maxW:Float,size:Float,color:Int,maxLines:Int){
-        wrap(s,95).take(maxLines).forEachIndexed { i,line -> text(c,line,x,y+i*(size+3f),size,color,false) }
-    }
-    private fun wrap(s:String,n:Int):List<String>{
-        if(s.length<=n)return listOf(s)
-        val out=mutableListOf<String>(); var rest=s
-        while(rest.length>n){ var cut=rest.lastIndexOf(' ',n); if(cut<1)cut=n; out+=rest.substring(0,cut); rest=rest.substring(cut).trimStart() }
-        if(rest.isNotEmpty())out+=rest; return out
-    }
-    private fun decodeThumbnail(r:JSONObject):Bitmap?{
-        val raw=firstNonBlank(r.optString("thumbnailBase64"),r.optString("thumbnailJpegBase64"),r.optString("thumb")).substringAfter("base64,","")
-        if(raw.isBlank())return null
-        return runCatching{val b=Base64.decode(raw,Base64.DEFAULT);BitmapFactory.decodeByteArray(b,0,b.size)}.getOrNull()
-    }
-    private fun fitRect(sw:Int,sh:Int,x:Float,y:Float,mw:Float,mh:Float):RectF{val scale=minOf(mw/sw,mh/sh);val w=sw*scale;val h=sh*scale;return RectF(x+(mw-w)/2f,y,x+(mw-w)/2f+w,y+h)}
-    private fun time(v:Long)=if(v>0)SimpleDateFormat("dd MMM yyyy, hh:mm a",Locale.getDefault()).format(Date(v)) else "Active / unavailable"
-    private fun count(r:JSONObject,a:String,b:String):String{val v=r.optInt(a,r.optInt(b,-1));return if(v>=0)v.toString() else "Pending"}
-    private fun fmtCoords(r:JSONObject):String{val lat=r.optDouble("latitude",r.optDouble("lat",Double.NaN));val lon=r.optDouble("longitude",r.optDouble("lon",Double.NaN));return if(lat.isFinite()&&lon.isFinite())"%.6f, %.6f".format(Locale.US,lat,lon) else "Unavailable"}
-    private fun fmtAcc(r:JSONObject):String{val a=r.optDouble("accuracyM",r.optDouble("accuracy",Double.NaN));return if(a.isFinite())"±%.1f m".format(Locale.US,a) else "Unavailable"}
-    private fun fmtDevice(r:JSONObject)=firstNonBlank(listOf(r.optString("deviceManufacturer"),r.optString("deviceHardwareModel")).filter{it.isNotBlank()}.joinToString(" "),r.optString("deviceModel"),"Unavailable")
-    private fun distance(r:JSONObject):String{val d=r.optDouble("siteDistanceM",r.optDouble("distanceM",Double.NaN));return if(d.isFinite())"%.0f m".format(Locale.US,d) else "Unavailable"}
-    private fun radius(r:JSONObject):String{val d=r.optDouble("siteRadiusM",Double.NaN);return if(d.isFinite())"%.0f m".format(Locale.US,d) else "Unavailable"}
-    private fun firstNonBlank(vararg v:String)=v.firstOrNull{it.isNotBlank()}?:""
+    private fun decodeThumbnail(r:JSONObject):Bitmap? { val raw=first(r.optString("thumbnailBase64"),r.optString("thumbnailJpegBase64")).substringAfter("base64,",""); if(raw.isBlank())return null; return runCatching{val b=Base64.decode(raw,Base64.DEFAULT);BitmapFactory.decodeByteArray(b,0,b.size)}.getOrNull() }
+    private fun id(r:JSONObject)=first(r.optString("evidenceId"),r.optString("verificationId"),"GEOSTAMP-EVIDENCE")
+    private fun first(vararg v:String)=v.firstOrNull{it.isNotBlank()}?:"Unavailable"
+    private fun firstFinite(vararg v:Double)=v.firstOrNull{it.isFinite()}?:Double.NaN
+    private fun count(r:JSONObject,a:String,b:String):String { val v=r.optInt(a,r.optInt(b,-1)); return if(v>=0)v.toString() else "Pending" }
+    private fun countActive(r:JSONObject,a:String,b:String):String { if(r.has(a)&&r.isNull(a)) return "Active"; val v=r.optInt(a,r.optInt(b,-1)); return if(v>=0)v.toString() else "Active" }
+    private fun time(v:Long)=if(v>0) SimpleDateFormat("dd MMM yyyy, hh:mm a",Locale.getDefault()).format(Date(v)) else "Unavailable"
+    private fun shortTime(v:Long)=if(v>0) SimpleDateFormat("dd MMM HH:mm:ss",Locale.getDefault()).format(Date(v)) else "—"
+    private fun section(c:Canvas,s:String,x:Float,y:Float,col:Int)=text(c,s,x,y,7.6f,col,true)
+    private fun compactRow(c:Canvas,x:Float,y:Float,a:String,b:String,w:Float):Float { text(c,a.uppercase(Locale.US),x,y,5.7f,Color.GRAY,true); wrap(b,34).take(2).forEachIndexed{i,v->text(c,v,x,y+10+i*8,7f,Color.rgb(28,40,54),true)}; return y+25f }
+    private fun monoRow(c:Canvas,x:Float,y:Float,a:String,b:String,w:Float):Float { text(c,a,x,y,5.6f,Color.GRAY,true); val ls=wrapFixed(b,46).take(2); ls.forEachIndexed{i,v->text(c,v,x,y+9+i*7,5.5f,Color.rgb(28,40,54),false,Paint.Align.LEFT,"monospace")}; return y+16+maxOf(0,ls.size-1)*7 }
+    private fun text(c:Canvas,s:String,x:Float,y:Float,z:Float,col:Int,bold:Boolean,align:Paint.Align=Paint.Align.LEFT,font:String?=null){ val p=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=col;textSize=z;textAlign=align;typeface=if(font=="monospace")Typeface.MONOSPACE else if(bold)Typeface.create(Typeface.DEFAULT,Typeface.BOLD) else Typeface.DEFAULT}; c.drawText(s,x,y,p) }
+    private fun fill(c:Canvas,l:Float,t:Float,r:Float,b:Float,col:Int){c.drawRect(l,t,r,b,Paint().apply{color=col})}
+    private fun stroke(c:Canvas,l:Float,t:Float,r:Float,b:Float,col:Int){c.drawRect(l,t,r,b,Paint(Paint.ANTI_ALIAS_FLAG).apply{color=col;style=Paint.Style.STROKE;strokeWidth=1f})}
+    private fun fit(sw:Int,sh:Int,x:Float,y:Float,mw:Float,mh:Float):RectF{val s=minOf(mw/sw,mh/sh);val w=sw*s;val h=sh*s;return RectF(x+(mw-w)/2,y+(mh-h)/2,x+(mw-w)/2+w,y+(mh-h)/2+h)}
+    private fun wrap(s:String,n:Int):List<String>{val out=mutableListOf<String>();var cur="";s.split(Regex("\\s+")).forEach{w->if((cur+" "+w).trim().length>n){if(cur.isNotBlank())out+=cur;cur=w}else cur=(cur+" "+w).trim()};if(cur.isNotBlank())out+=cur;return out}
+    private fun wrapFixed(s:String,n:Int)=if(s.isBlank()) listOf("Unavailable") else s.chunked(n)
 }

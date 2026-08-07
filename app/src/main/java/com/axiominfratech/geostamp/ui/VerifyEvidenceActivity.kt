@@ -200,7 +200,7 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         )
         binding.tvResultSummary.text = when {
             risk -> "Registry record found; location-integrity signals require review."
-            registryBacked && !hasMandatoryVisual -> "Registry record found, but the mandatory evidence visual is unavailable."
+            registryBacked && !hasVisual -> "Registry record found, but the mandatory evidence visual is unavailable."
             registryBacked -> "Evidence ID and mandatory visual evidence confirmed for this record."
             else -> "GeoStamp QR record decoded; public registration is not confirmed."
         }
@@ -235,7 +235,7 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         binding.trustCard.visibility = View.GONE
         binding.timelineCard.visibility = View.GONE
         binding.resultCard.visibility = View.VISIBLE
-        binding.btnViewReport.visibility = if (hasMandatoryVisual) View.VISIBLE else View.GONE
+        binding.btnViewReport.visibility = if (hasVisual) View.VISIBLE else View.GONE
         binding.btnViewReport.text = "SHARE REPORT · PDF"
         binding.tvError.visibility = View.GONE
     }
@@ -245,7 +245,7 @@ class VerifyEvidenceActivity : AppCompatActivity() {
             record.optString("thumbnailBase64"),
             record.optString("thumbnailJpegBase64"),
             record.optString("thumb")
-        ).substringAfter("base64,", "")
+        ).let { value -> if (value.contains("base64,")) value.substringAfter("base64,") else value }
         if (raw.isBlank()) {
             binding.ivEvidenceThumbnail.visibility = View.GONE
             binding.tvThumbnailUnavailable.visibility = View.VISIBLE

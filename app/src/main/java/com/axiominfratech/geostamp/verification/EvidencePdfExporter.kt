@@ -6,6 +6,8 @@ import android.graphics.*
 import android.graphics.pdf.PdfDocument
 import android.util.Base64
 import androidx.core.content.FileProvider
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.qrcode.QRCodeWriter
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
@@ -94,13 +96,17 @@ object EvidencePdfExporter {
         // AI summary: descriptive only
         var bandY = 340f
         val ai = r.optString("aiVisualSummary").trim()
-        val purpose = r.optString("aiLikelyPurpose").trim()
+        val purpose = first(r.optString("aiVisualPurpose"), r.optString("aiLikelyPurpose"), "").takeIf { it != "Unavailable" }.orEmpty().trim()
         if (ai.isNotBlank() || purpose.isNotBlank()) {
             section(c,"AI VISUAL SUMMARY",M,bandY,green)
-            val summary = listOfNotNull(ai.takeIf{it.isNotBlank()}, purpose.takeIf{it.isNotBlank()}?.let{"Likely documentation purpose: $it"}).joinToString("  ")
-            val lines = wrap(summary, 82)
-            lines.take(2).forEachIndexed { i,v -> text(c,v,M,bandY+16+i*10,7.2f,Color.rgb(55,65,75),false) }
-            text(c,"Descriptive assistance only · not part of authentication result",W-M,bandY+16,6.1f,Color.GRAY,false,Paint.Align.RIGHT)
+            val summary = listOfNotNull(
+                ai.takeIf { it.isNotBlank() },
+                purpose.takeIf { it.isNotBlank() }?.let { "Likely documentation purpose: $it" }
+            ).joinToString("  ")
+            wrap(summary, 82).take(2).forEachIndexed { i,v ->
+                text(c,v,M,bandY+16+i*10,7.2f,Color.rgb(55,65,75),false)
+            }
+            text(c,"AI description only · excluded from PASS/FAIL authentication",W-M,bandY+16,6.1f,Color.GRAY,false,Paint.Align.RIGHT)
             bandY += 42f
         }
 
@@ -184,6 +190,17 @@ object EvidencePdfExporter {
 
         val noteY=findingY+57f
         text(c,"GeoStamp authenticates the digital evidence record and recorded capture metadata; it does not independently establish the truth of objects or events depicted.",M,noteY,5.8f,Color.GRAY,false)
+
+        // Public verification: machine-readable independent lookup reference.
+        val verifyUrl = "https://ahz-creator.github.io/GeoStamp-Portal/?id=${id(r)}"
+        val qrTop = noteY + 12f
+        val qrSize = 58f
+        drawQr(c, verifyUrl, M, qrTop, qrSize)
+        text(c,"PUBLIC VERIFICATION",M+qrSize+10f,qrTop+12f,6.2f,green,true)
+        text(c,id(r),M+qrSize+10f,qrTop+25f,7.2f,Color.rgb(30,42,55),true)
+        text(c,"Scan QR or verify by Evidence ID in the GeoStamp public registry.",M+qrSize+10f,qrTop+38f,6.0f,Color.GRAY,false)
+        text(c,"Report generated ${time(System.currentTimeMillis())}",M+qrSize+10f,qrTop+51f,5.8f,Color.GRAY,false)
+
         text(c,"GeoStamp · Axiom Infratech",M,H-20f,6.2f,Color.GRAY,true)
         text(c,"PAGE 1 OF 1",W-M,H-20f,6.2f,Color.GRAY,true,Paint.Align.RIGHT)
     }
@@ -197,7 +214,34 @@ object EvidencePdfExporter {
         }
     }.getOrNull()
 
-    private fun decodeThumbnail(r:JSONObject):Bitmap? { val raw=first(r.optString("thumbnailBase64"),r.optString("thumbnailJpegBase64")).substringAfter("base64,",""); if(raw.isBlank())return null; return runCatching{val b=Base64.decode(raw,Base64.DEFAULT);BitmapFactory.decodeByteArray(b,0,b.size)}.getOrNull() }
+    private fun drawQr(c: Canvas, value: String, x: Float, y: Float, size: Float) {
+        runCatching {
+            val matrix = QRCodeWriter().encode(value, BarcodeFormat.QR_CODE, 160, 160)
+            val bitmap = Bitmap.createBitmap(matrix.width, matrix.height, Bitmap.Config.ARGB_8888)
+            for (xx in 0 until matrix.width) {
+                for (yy in 0 until matrix.height) {
+                    bitmap.setPixel(xx, yy, if (matrix[xx, yy]) Color.BLACK else Color.WHITE)
+                }
+            }
+            c.drawBitmap(bitmap, null, RectF(x, y, x + size, y + size), Paint(Paint.ANTI_ALIAS_FLAG))
+            bitmap.recycle()
+        }
+    }
+
+    private fun decodeThumbnail(r: JSONObject): Bitmap? {
+        val source = first(
+            r.optString("thumbnailBase64"),
+            r.optString("thumbnailJpegBase64"),
+            r.optString("thumb")
+        ).trim()
+        if (source.isBlank() || source == "Unavailable") return null
+        val raw = if (source.contains("base64,")) source.substringAfter("base64,") else source
+        if (raw.isBlank()) return null
+        return runCatching {
+            val bytes = Base64.decode(raw, Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        }.getOrNull()
+    }
     private fun id(r:JSONObject)=first(r.optString("evidenceId"),r.optString("verificationId"),"GEOSTAMP-EVIDENCE")
     private fun first(vararg v:String)=v.firstOrNull{it.isNotBlank()}?:"Unavailable"
     private fun firstFinite(vararg v:Double)=v.firstOrNull{it.isFinite()}?:Double.NaN

@@ -502,6 +502,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         put("operatorSessionOperatorId", operatorSession?.operatorId ?: "")
                         put("operatorSessionOperatorName", operatorSession?.operatorName ?: "")
                         put("thumbnailBase64", slipThumbnailBase64)
+                        put("thumbnailMimeType", "image/jpeg")
+                        put("thumbnailSha256", thumbnailSha256)
+                        put("visualEvidenceRequired", true)
+                        put("aiVisualSummary", aiVisual.summary)
+                        put("aiVisualPurpose", aiVisual.purpose)
+                        put("aiVisualSummaryStatus", aiVisual.status)
+                        put("aiVisualSummaryProvider", aiVisual.provider)
                         val slipKeys = slipSession.keys()
                         while (slipKeys.hasNext()) {
                             val slipKey = slipKeys.next()

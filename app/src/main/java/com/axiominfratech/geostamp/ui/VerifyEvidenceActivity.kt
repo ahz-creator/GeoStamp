@@ -22,6 +22,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.axiominfratech.geostamp.databinding.ActivityVerifyEvidenceBinding
 import com.axiominfratech.geostamp.verification.EvidencePdfExporter
+import com.axiominfratech.geostamp.verification.EvidenceRegistryOutbox
 import com.axiominfratech.geostamp.verification.RegistryPublisher
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
@@ -156,7 +157,7 @@ class VerifyEvidenceActivity : AppCompatActivity() {
                 RegistryPublisher.lookup(this@VerifyEvidenceActivity, currentVerificationId.orEmpty())
             }
             binding.progress.visibility = View.GONE
-            showRecord(publicRecord ?: embeddedRecord, publicRecord != null)
+            showRecord(mergeLocalVisualFields(publicRecord ?: embeddedRecord, id), publicRecord != null)
         }
     }
 
@@ -173,7 +174,10 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) { RegistryPublisher.lookup(this@VerifyEvidenceActivity, id) }
             binding.progress.visibility = View.GONE
-            if (result != null) showRecord(result, true) else showNotRegistered(id)
+            if (result != null) showRecord(mergeLocalVisualFields(result, id), true) else {
+                val local = EvidenceRegistryOutbox.publishedRecord(this@VerifyEvidenceActivity, id)
+                if (local != null) showRecord(local, true) else showNotRegistered(id)
+            }
         }
     }
 
@@ -273,6 +277,23 @@ class VerifyEvidenceActivity : AppCompatActivity() {
             append("Entire session: ${displayCount(totalSession)} photos  •  ${displayCount(sitesVisited)} sites")
         }
         binding.tvSessionActivity.visibility = View.VISIBLE
+    }
+
+    private fun mergeLocalVisualFields(remote: JSONObject, evidenceId: String): JSONObject {
+        val local = EvidenceRegistryOutbox.publishedRecord(this, evidenceId) ?: return remote
+        val merged = JSONObject(remote.toString())
+        val keys = arrayOf(
+            "thumbnailBase64", "thumbnailJpegBase64",
+            "sitePhotosBefore", "sitePhotosAfter", "siteSessionPhotoTotal",
+            "operatorSessionPhotoTotal", "operatorSessionSitesVisited",
+            "operatorSessionStartedAt", "operatorSessionClockOutAt",
+            "operatorSessionClockOutReason", "siteDistanceM", "siteRadiusM"
+        )
+        keys.forEach { key ->
+            val remoteMissing = !merged.has(key) || merged.isNull(key) || merged.optString(key).isBlank()
+            if (remoteMissing && local.has(key) && !local.isNull(key)) merged.put(key, local.opt(key))
+        }
+        return merged
     }
 
     private fun displayCount(value: Int): String = if (value >= 0) value.toString() else "Pending"

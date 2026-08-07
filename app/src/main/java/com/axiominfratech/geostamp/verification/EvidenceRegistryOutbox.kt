@@ -58,6 +58,13 @@ object EvidenceRegistryOutbox {
             // Compact mobile slip fields. These are public-safe, compressed values.
             copyIfPresent(fullMetadata, this, "thumbnailBase64")
             copyIfPresent(fullMetadata, this, "thumbnailJpegBase64")
+            put("visualEvidenceRequired", true)
+            copyIfPresent(fullMetadata, this, "thumbnailMimeType")
+            copyIfPresent(fullMetadata, this, "thumbnailSha256")
+            copyIfPresent(fullMetadata, this, "aiVisualSummary")
+            copyIfPresent(fullMetadata, this, "aiVisualPurpose")
+            copyIfPresent(fullMetadata, this, "aiVisualSummaryStatus")
+            copyIfPresent(fullMetadata, this, "aiVisualSummaryProvider")
             copyIfPresent(fullMetadata, this, "operatorSessionId")
             copyIfPresent(fullMetadata, this, "operatorSessionStartedAt")
             copyIfPresent(fullMetadata, this, "operatorSessionLastActivityAt")

@@ -13,35 +13,54 @@ object EvidenceSlipMetadata {
 
     fun thumbnailBase64(
         imageFile: File,
-        maxWidth: Int = 480,
-        maxHeight: Int = 320,
-        quality: Int = 68
+        maxWidth: Int = 320,
+        maxHeight: Int = 240,
+        targetBase64Chars: Int = 28000
     ): String = runCatching {
-        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(imageFile.absolutePath, options)
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(imageFile.absolutePath, bounds)
+        require(bounds.outWidth > 0 && bounds.outHeight > 0) { "Evidence image could not be decoded" }
+
         var sample = 1
-        while (options.outWidth / sample > maxWidth * 2 || options.outHeight / sample > maxHeight * 2) {
-            sample *= 2
-        }
+        while (bounds.outWidth / sample > maxWidth * 2 || bounds.outHeight / sample > maxHeight * 2) sample *= 2
         val decoded = BitmapFactory.decodeFile(
             imageFile.absolutePath,
             BitmapFactory.Options().apply { inSampleSize = sample }
-        ) ?: return ""
-        val ratio = minOf(maxWidth.toFloat() / decoded.width, maxHeight.toFloat() / decoded.height, 1f)
-        val scaled = if (ratio < 1f) {
-            Bitmap.createScaledBitmap(
+        ) ?: error("Evidence thumbnail decode failed")
+
+        var working = decoded
+        val initialScale = minOf(maxWidth.toFloat() / decoded.width, maxHeight.toFloat() / decoded.height, 1f)
+        if (initialScale < 1f) {
+            working = Bitmap.createScaledBitmap(
                 decoded,
-                (decoded.width * ratio).toInt().coerceAtLeast(1),
-                (decoded.height * ratio).toInt().coerceAtLeast(1),
+                (decoded.width * initialScale).toInt().coerceAtLeast(1),
+                (decoded.height * initialScale).toInt().coerceAtLeast(1),
                 true
             )
-        } else decoded
-        val output = ByteArrayOutputStream()
-        scaled.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(45, 80), output)
-        if (scaled !== decoded) scaled.recycle()
+        }
+
+        var quality = 62
+        var encoded = ""
+        repeat(8) {
+            val out = ByteArrayOutputStream()
+            working.compress(Bitmap.CompressFormat.JPEG, quality, out)
+            encoded = Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
+            if (encoded.length <= targetBase64Chars) return@repeat
+            quality = (quality - 7).coerceAtLeast(35)
+            if (quality <= 42 && encoded.length > targetBase64Chars) {
+                val nextW = (working.width * 0.86f).toInt().coerceAtLeast(180)
+                val nextH = (working.height * 0.86f).toInt().coerceAtLeast(120)
+                val next = Bitmap.createScaledBitmap(working, nextW, nextH, true)
+                if (working !== decoded) working.recycle()
+                working = next
+            }
+        }
+        if (working !== decoded) working.recycle()
         decoded.recycle()
-        Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP)
-    }.getOrDefault("")
+        require(encoded.isNotBlank()) { "Evidence thumbnail generation failed" }
+        encoded
+    }.getOrElse { "" }
+
 
     /** Snapshot taken immediately before the reference capture is counted. */
     fun sessionSnapshot(

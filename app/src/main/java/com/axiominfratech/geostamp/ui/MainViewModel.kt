@@ -33,6 +33,7 @@ import com.axiominfratech.geostamp.verification.EvidenceRegistryOutbox
 import com.axiominfratech.geostamp.verification.RegistryPublisher
 import com.axiominfratech.geostamp.verification.RegistrySyncManager
 import com.axiominfratech.geostamp.verification.EvidenceSlipMetadata
+import com.axiominfratech.geostamp.verification.AiVisualSummaryClient
 import com.axiominfratech.geostamp.core.OperatorSessionManager
 import com.axiominfratech.geostamp.config.RemoteConfigManager
 import org.json.JSONArray
@@ -414,6 +415,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val stampedFile = cameraManager.captureAndStamp(overlayData, outputDir)
                 val slipThumbnailBase64 = withContext(Dispatchers.IO) {
                     EvidenceSlipMetadata.thumbnailBase64(stampedFile)
+                }
+                if (slipThumbnailBase64.isBlank()) {
+                    _captureEvent.emit(CaptureEvent.Error("Visual evidence thumbnail could not be generated. Evidence was not registered."))
+                    return@launch
+                }
+                val thumbnailBytes = android.util.Base64.decode(slipThumbnailBase64, android.util.Base64.DEFAULT)
+                val thumbnailSha256 = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(thumbnailBytes).joinToString("") { "%02x".format(it) }
+                val aiVisual = withContext(Dispatchers.IO) {
+                    AiVisualSummaryClient.analyze(
+                        app,
+                        slipThumbnailBase64,
+                        operatorStr,
+                        siteIdStr,
+                        location.timestampMs
+                    )
                 }
                 val slipSession = EvidenceSlipMetadata.sessionSnapshot(operatorSession, siteIdStr)
 

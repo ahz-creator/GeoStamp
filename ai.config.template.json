@@ -1,0 +1,6 @@
+{
+  "enabled": false,
+  "endpoint": "",
+  "provider": "server-side-vision-model",
+  "schemaVersion": 1
+}

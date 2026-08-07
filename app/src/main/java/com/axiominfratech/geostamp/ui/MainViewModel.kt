@@ -33,6 +33,7 @@ import com.axiominfratech.geostamp.verification.EvidenceRegistryOutbox
 import com.axiominfratech.geostamp.verification.RegistryPublisher
 import com.axiominfratech.geostamp.verification.RegistrySyncManager
 import com.axiominfratech.geostamp.verification.EvidenceSlipMetadata
+import com.axiominfratech.geostamp.verification.EvidenceVisualCache
 import com.axiominfratech.geostamp.verification.AiVisualSummaryClient
 import com.axiominfratech.geostamp.core.OperatorSessionManager
 import com.axiominfratech.geostamp.config.RemoteConfigManager

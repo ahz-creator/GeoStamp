@@ -23,6 +23,7 @@ import androidx.lifecycle.lifecycleScope
 import com.axiominfratech.geostamp.databinding.ActivityVerifyEvidenceBinding
 import com.axiominfratech.geostamp.verification.EvidencePdfExporter
 import com.axiominfratech.geostamp.verification.EvidenceRegistryOutbox
+import com.axiominfratech.geostamp.verification.EvidenceVisualCache
 import com.axiominfratech.geostamp.verification.RegistryPublisher
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
@@ -185,9 +186,13 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         currentRecord = record
         val risk = record.optBoolean("locationRisk", false) ||
             record.optBoolean("locationIntegrityRisk", false) || record.optInt("lr", 0) == 1
+        val hasVisual = firstNonBlank(
+            record.optString("thumbnailBase64"), record.optString("thumbnailJpegBase64"), record.optString("thumb")
+        ).isNotBlank()
         binding.tvResultStatus.text = when {
             risk -> "REGISTERED · REVIEW REQUIRED"
-            registryBacked -> "VERIFIED · REGISTERED"
+            registryBacked && hasVisual -> "VERIFIED · REGISTERED"
+            registryBacked -> "REGISTERED · VISUAL INCOMPLETE"
             else -> "QR RECORD FOUND"
         }
         binding.tvResultStatus.setTextColor(
@@ -280,8 +285,10 @@ class VerifyEvidenceActivity : AppCompatActivity() {
     }
 
     private fun mergeLocalVisualFields(remote: JSONObject, evidenceId: String): JSONObject {
-        val local = EvidenceRegistryOutbox.publishedRecord(this, evidenceId) ?: return remote
+        val published = EvidenceRegistryOutbox.publishedRecord(this, evidenceId)
+        val visual = EvidenceVisualCache.load(this, evidenceId)
         val merged = JSONObject(remote.toString())
+        val local = published ?: visual ?: return merged
         val keys = arrayOf(
             "thumbnailBase64", "thumbnailJpegBase64",
             "sitePhotosBefore", "sitePhotosAfter", "siteSessionPhotoTotal",
@@ -292,6 +299,15 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         keys.forEach { key ->
             val remoteMissing = !merged.has(key) || merged.isNull(key) || merged.optString(key).isBlank()
             if (remoteMissing && local.has(key) && !local.isNull(key)) merged.put(key, local.opt(key))
+        }
+        if (merged.optString("thumbnailBase64").isBlank()) {
+            val cachedVisual = visual ?: EvidenceVisualCache.load(this, evidenceId)
+            val cachedThumb = cachedVisual?.optString("thumbnailBase64").orEmpty()
+            if (cachedThumb.isNotBlank()) {
+                merged.put("thumbnailBase64", cachedThumb)
+                merged.put("thumbnailMimeType", "image/jpeg")
+                if (cachedVisual?.has("thumbnailSha256") == true) merged.put("thumbnailSha256", cachedVisual.optString("thumbnailSha256"))
+            }
         }
         return merged
     }

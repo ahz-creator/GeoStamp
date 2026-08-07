@@ -212,12 +212,12 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         val maskedDevice = firstNonBlank(record.optString("maskedGeoStampDeviceIdentity"), "Unavailable")
 
         binding.tvResultDetails.text = buildString {
-            append("EVIDENCE ID\n$id\n\n")
-            append("CAPTURED\n${formatTime(capturedAt)}\n\n")
-            append("OPERATOR / PROJECT\n$primary\n\n")
-            append("SITE / REFERENCE\n$secondary\n\n")
-            append("LOCATION\n$location\n\n")
-            append("DEVICE\n$device · $maskedDevice")
+            append("EVIDENCE  •  $id\n")
+            append("CAPTURED  •  ${formatTime(capturedAt)}\n")
+            append("OPERATOR  •  $primary\n")
+            append("SITE  •  $secondary\n")
+            append("GPS  •  $location\n")
+            append("DEVICE  •  $device · $maskedDevice")
         }
 
         renderThumbnail(record)
@@ -226,7 +226,7 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         binding.timelineCard.visibility = View.GONE
         binding.resultCard.visibility = View.VISIBLE
         binding.btnViewReport.visibility = View.VISIBLE
-        binding.btnViewReport.text = "SHARE PDF REPORT"
+        binding.btnViewReport.text = "SHARE REPORT · PDF"
         binding.tvError.visibility = View.GONE
     }
 
@@ -267,11 +267,10 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         val totalSession = record.optInt("operatorSessionPhotoTotal", record.optInt("sessionPhotoTotal", -1))
         val sitesVisited = record.optInt("operatorSessionSitesVisited", record.optInt("sessionSitesVisited", -1))
         binding.tvSessionActivity.text = buildString {
-            append("SESSION ACTIVITY\n")
-            append("Clock-in: ${formatTime(sessionStarted)}\n")
-            append("Reference: ${formatTime(capturedAt)} · $siteId\n")
-            append("Before: ${displayCount(beforeSite)}   After: ${displayCount(afterSite)}   Site total: ${displayCount(totalSite)}\n")
-            append("Session total: ${displayCount(totalSession)}   Sites visited: ${displayCount(sitesVisited)}")
+            append("THIS FIELD SESSION\n")
+            append("Clock-in ${formatTime(sessionStarted)}  •  Reference ${formatTime(capturedAt)}\n")
+            append("At $siteId: ${displayCount(beforeSite)} before  •  ${displayCount(afterSite)} after  •  ${displayCount(totalSite)} total\n")
+            append("Entire session: ${displayCount(totalSession)} photos  •  ${displayCount(sitesVisited)} sites")
         }
         binding.tvSessionActivity.visibility = View.VISIBLE
     }

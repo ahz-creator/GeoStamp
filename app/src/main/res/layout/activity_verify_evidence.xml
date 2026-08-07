@@ -174,7 +174,7 @@
                 <ImageView
                     android:id="@+id/iv_evidence_thumbnail"
                     android:layout_width="match_parent"
-                    android:layout_height="150dp"
+                    android:layout_height="118dp"
                     android:background="#E9EEF4"
                     android:contentDescription="Evidence thumbnail"
                     android:scaleType="centerCrop"
@@ -183,7 +183,7 @@
                 <TextView
                     android:id="@+id/tv_thumbnail_unavailable"
                     android:layout_width="match_parent"
-                    android:layout_height="52dp"
+                    android:layout_height="38dp"
                     android:gravity="center"
                     android:text="Thumbnail not stored in this registry record"
                     android:textColor="#687789"
@@ -193,7 +193,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="14dp">
+                    android:padding="12dp">
 
                     <TextView
                         android:id="@+id/tv_result_status"
@@ -201,7 +201,7 @@
                         android:layout_height="wrap_content"
                         android:text="VERIFIED · REGISTERED"
                         android:textColor="#159447"
-                        android:textSize="19sp"
+                        android:textSize="17sp"
                         android:textStyle="bold" />
 
                     <TextView
@@ -224,7 +224,7 @@
                         android:layout_height="wrap_content"
                         android:lineSpacingExtra="2dp"
                         android:textColor="#17233A"
-                        android:textSize="12sp" />
+                        android:textSize="11sp" />
 
                     <TextView
                         android:id="@+id/tv_session_activity"
@@ -241,10 +241,10 @@
                     <Button
                         android:id="@+id/btn_view_report"
                         android:layout_width="match_parent"
-                        android:layout_height="46dp"
-                        android:layout_marginTop="12dp"
+                        android:layout_height="44dp"
+                        android:layout_marginTop="10dp"
                         android:backgroundTint="#28C3E5"
-                        android:text="SHARE PDF REPORT"
+                        android:text="SHARE REPORT · PDF"
                         android:textColor="#04101B"
                         android:textStyle="bold" />
 

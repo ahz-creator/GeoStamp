@@ -94,7 +94,7 @@ object EvidencePdfExporter {
         text(canvas, "GEOSTAMP", MARGIN, 48f, 25f, Color.WHITE, true)
         text(canvas, "Axiom Infratech", MARGIN, 73f, 13f, Color.rgb(94, 208, 230), true)
         text(canvas, "DIGITAL EVIDENCE VERIFICATION", PAGE_W - MARGIN, 48f, 11f, Color.WHITE, true, Paint.Align.RIGHT)
-        text(canvas, "MOBILE PDF REPORT", PAGE_W - MARGIN, 69f, 9f, Color.rgb(190, 205, 220), false, Paint.Align.RIGHT)
+        text(canvas, "FORENSIC EVIDENCE REPORT", PAGE_W - MARGIN, 69f, 9f, Color.rgb(190, 205, 220), false, Paint.Align.RIGHT)
 
         val status = if (record.optBoolean("locationRisk", false) || record.optBoolean("locationIntegrityRisk", false)) {
             "REGISTERED — REVIEW REQUIRED"
@@ -182,13 +182,15 @@ object EvidencePdfExporter {
             "Capture signature" to record.optString("captureSignature", "Unavailable"),
             "Operator session ID" to record.optString("operatorSessionId", "Unavailable"),
             "Operator clock-in" to time(record.optLong("operatorSessionStartedAt", 0L)),
-            "Photos before at site" to count(record, "sitePhotosBefore", "photosBeforeAtSite"),
-            "Photos after at site" to count(record, "sitePhotosAfter", "photosAfterAtSite"),
-            "Total at site" to count(record, "siteSessionPhotoTotal", "sitePhotoTotal"),
-            "Operator-session total" to count(record, "operatorSessionPhotoTotal", "sessionPhotoTotal"),
-            "Sites visited" to count(record, "operatorSessionSitesVisited", "sessionSitesVisited"),
+            "Photos before this evidence (same site)" to count(record, "sitePhotosBefore", "photosBeforeAtSite"),
+            "Photos after this evidence (same site)" to count(record, "sitePhotosAfter", "photosAfterAtSite"),
+            "Total photos at this site in session" to count(record, "siteSessionPhotoTotal", "sitePhotoTotal"),
+            "Total photos in operator session" to count(record, "operatorSessionPhotoTotal", "sessionPhotoTotal"),
+            "Sites visited in operator session" to count(record, "operatorSessionSitesVisited", "sessionSitesVisited"),
             "Clock-out" to time(record.optLong("operatorSessionClockOutAt", 0L)),
-            "Clock-out reason" to record.optString("operatorSessionClockOutReason", "Active / pending")
+            "Clock-out reason" to record.optString("operatorSessionClockOutReason", "Active / pending"),
+            "Distance from matched site at capture" to distance(record),
+            "Applied site radius" to radius(record)
         )
         for ((label, value) in fields) {
             y = drawWrappedRow(canvas, label, value, y)
@@ -266,6 +268,16 @@ object EvidencePdfExporter {
     private fun time(value: Long): String = if (value > 0L) {
         SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date(value))
     } else "Unavailable"
+
+    private fun distance(record: JSONObject): String {
+        val value = record.optDouble("siteDistanceM", record.optDouble("distanceM", Double.NaN))
+        return if (value.isFinite()) "%.1f m".format(Locale.US, value) else "Unavailable"
+    }
+
+    private fun radius(record: JSONObject): String {
+        val value = record.optDouble("siteRadiusM", Double.NaN)
+        return if (value.isFinite()) "%.0f m".format(Locale.US, value) else "Unavailable"
+    }
 
     private fun count(record: JSONObject, first: String, second: String): String {
         val value = record.optInt(first, record.optInt(second, -1))

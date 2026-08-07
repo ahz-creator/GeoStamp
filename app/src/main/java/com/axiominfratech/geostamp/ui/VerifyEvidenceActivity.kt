@@ -200,7 +200,8 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         )
         binding.tvResultSummary.text = when {
             risk -> "Registry record found; location-integrity signals require review."
-            registryBacked -> "Evidence ID confirmed in the GeoStamp Public Registry."
+            registryBacked && !hasMandatoryVisual -> "Registry record found, but the mandatory evidence visual is unavailable."
+            registryBacked -> "Evidence ID and mandatory visual evidence confirmed for this record."
             else -> "GeoStamp QR record decoded; public registration is not confirmed."
         }
 
@@ -234,7 +235,7 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         binding.trustCard.visibility = View.GONE
         binding.timelineCard.visibility = View.GONE
         binding.resultCard.visibility = View.VISIBLE
-        binding.btnViewReport.visibility = View.VISIBLE
+        binding.btnViewReport.visibility = if (hasMandatoryVisual) View.VISIBLE else View.GONE
         binding.btnViewReport.text = "SHARE REPORT · PDF"
         binding.tvError.visibility = View.GONE
     }
@@ -286,7 +287,7 @@ class VerifyEvidenceActivity : AppCompatActivity() {
 
     private fun mergeLocalVisualFields(remote: JSONObject, evidenceId: String): JSONObject {
         val published = EvidenceRegistryOutbox.publishedRecord(this, evidenceId)
-        val visual = EvidenceVisualCache.load(this, evidenceId)
+        val visual = EvidenceVisualCache.loadOrRecover(this, evidenceId)
         val merged = JSONObject(remote.toString())
         val local = published ?: visual ?: return merged
         val keys = arrayOf(
@@ -301,7 +302,7 @@ class VerifyEvidenceActivity : AppCompatActivity() {
             if (remoteMissing && local.has(key) && !local.isNull(key)) merged.put(key, local.opt(key))
         }
         if (merged.optString("thumbnailBase64").isBlank()) {
-            val cachedVisual = visual ?: EvidenceVisualCache.load(this, evidenceId)
+            val cachedVisual = visual ?: EvidenceVisualCache.loadOrRecover(this, evidenceId)
             val cachedThumb = cachedVisual?.optString("thumbnailBase64").orEmpty()
             if (cachedThumb.isNotBlank()) {
                 merged.put("thumbnailBase64", cachedThumb)

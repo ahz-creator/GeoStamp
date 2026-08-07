@@ -424,6 +424,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val thumbnailBytes = android.util.Base64.decode(slipThumbnailBase64, android.util.Base64.DEFAULT)
                 val thumbnailSha256 = java.security.MessageDigest.getInstance("SHA-256")
                     .digest(thumbnailBytes).joinToString("") { "%02x".format(it) }
+                if (!EvidenceVisualCache.save(app, evidenceId, slipThumbnailBase64, thumbnailSha256)) {
+                    _captureEvent.emit(CaptureEvent.Error("Mandatory visual evidence could not be persisted. Evidence was not registered."))
+                    return@launch
+                }
                 val aiVisual = withContext(Dispatchers.IO) {
                     AiVisualSummaryClient.analyze(
                         app,

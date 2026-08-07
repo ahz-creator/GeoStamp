@@ -228,6 +228,11 @@ class VerifyEvidenceActivity : AppCompatActivity() {
             append("SITE  •  $secondary\n")
             append("GPS  •  $location\n")
             append("DEVICE  •  $device · $maskedDevice")
+            val aiObjects = firstNonBlank(
+                record.optString("aiObjectCountSummary"),
+                record.optString("aiVisualSummary")
+            )
+            if (aiObjects.isNotBlank()) append("\nAI OBJECTS  •  $aiObjects")
         }
 
         renderThumbnail(record)
@@ -295,7 +300,8 @@ class VerifyEvidenceActivity : AppCompatActivity() {
             "sitePhotosBefore", "sitePhotosAfter", "siteSessionPhotoTotal",
             "operatorSessionPhotoTotal", "operatorSessionSitesVisited",
             "operatorSessionStartedAt", "operatorSessionClockOutAt",
-            "operatorSessionClockOutReason", "siteDistanceM", "siteRadiusM"
+            "operatorSessionClockOutReason", "siteDistanceM", "siteRadiusM",
+            "aiObjectCountSummary", "aiVisualSummary", "aiVisualSummaryStatus", "aiVisualSummaryProvider"
         )
         keys.forEach { key ->
             val remoteMissing = !merged.has(key) || merged.isNull(key) || merged.optString(key).isBlank()

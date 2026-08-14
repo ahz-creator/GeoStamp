@@ -4,7 +4,6 @@ import android.animation.LayoutTransition
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.StateListDrawable
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
@@ -36,10 +35,9 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         _binding = FragmentStampOptionsBinding.bind(view)
-
         binding.btnBack.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.text_primary))
         binding.btnBack.setOnClickListener { parentFragmentManager.popBackStack() }
-
+        hideRemovedLayouts()
         bindAccordions()
         bindControls()
         setupAutoSaveInset()
@@ -59,6 +57,17 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
         }
     }
 
+    private fun hideRemovedLayouts() {
+        // Card is now the only saved-photo layout exposed to users.
+        binding.radioLayoutStrip.visibility = View.GONE
+        binding.radioLayoutFooter.visibility = View.GONE
+        binding.radioLayoutCard.layoutParams = binding.radioLayoutCard.layoutParams.apply {
+            width = 0
+            (this as? android.widget.LinearLayout.LayoutParams)?.weight = 1f
+        }
+        binding.radioLayoutCard.text = "Card"
+    }
+
     private fun bindAccordions() {
         val sections = listOf(
             binding.sectionSiteHeader to Pair(Section.SITE, binding.sectionSiteContent),
@@ -69,19 +78,8 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
         )
         sections.forEach { (header, pair) -> header.setOnClickListener { openSection(pair.first) } }
         binding.sectionSavedContent.post { openSection(Section.SAVED, false) }
-
-        binding.sectionSavedHeader.layoutParams = binding.sectionSavedHeader.layoutParams.apply {
-            if (this is ViewGroup.MarginLayoutParams) bottomMargin = 0
-        }
-        binding.sectionSavedContent.layoutParams = binding.sectionSavedContent.layoutParams.apply {
-            if (this is ViewGroup.MarginLayoutParams) topMargin = 0
-        }
-
-        fun rename(v: View) {
-            if (v is TextView && v.text.toString().trim().equals("Theme", true)) v.text = "STAMP THEME"
-            if (v is ViewGroup) for (i in 0 until v.childCount) rename(v.getChildAt(i))
-        }
-        rename(binding.sectionSavedContent)
+        binding.sectionSavedHeader.layoutParams = binding.sectionSavedHeader.layoutParams.apply { if (this is ViewGroup.MarginLayoutParams) bottomMargin = 0 }
+        binding.sectionSavedContent.layoutParams = binding.sectionSavedContent.layoutParams.apply { if (this is ViewGroup.MarginLayoutParams) topMargin = 0 }
     }
 
     private fun openSection(section: Section, animate: Boolean = true) {
@@ -92,13 +90,10 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
             Section.CAMERA to binding.sectionCameraContent,
             Section.PROTECTION to binding.sectionProtectionContent
         )
-        if (animate) (binding.sectionSavedContent.parent as? ViewGroup)?.layoutTransition = LayoutTransition().apply {
-            enableTransitionType(LayoutTransition.CHANGING)
-        }
+        if (animate) (binding.sectionSavedContent.parent as? ViewGroup)?.layoutTransition = LayoutTransition().apply { enableTransitionType(LayoutTransition.CHANGING) }
         pairs.forEach { (key, content) ->
-            val show = key == section
             content.animate().cancel()
-            content.visibility = if (show) View.VISIBLE else View.GONE
+            content.visibility = if (key == section) View.VISIBLE else View.GONE
             content.alpha = 1f
         }
         binding.tvSiteChevron.text = if (section == Section.SITE) "⌃" else "⌄"
@@ -109,19 +104,15 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
     }
 
     private fun bindControls() {
-        binding.groupLayout.setOnCheckedChangeListener { _, id -> if (!applyingState) when (id) {
-            R.id.radio_layout_card -> viewModel.updateSavedStampLayout(SavedStampLayout.CARD)
-            R.id.radio_layout_strip -> viewModel.updateSavedStampLayout(SavedStampLayout.STRIP)
-            R.id.radio_layout_footer -> viewModel.updateSavedStampLayout(SavedStampLayout.FOOTER)
-        } }
+        binding.groupLayout.setOnCheckedChangeListener { _, id ->
+            if (!applyingState && id == R.id.radio_layout_card) viewModel.updateSavedStampLayout(SavedStampLayout.CARD)
+        }
         binding.groupSize.setOnCheckedChangeListener { _, id -> if (!applyingState) when (id) {
             R.id.radio_size_compact -> viewModel.updateSavedOverlayHeight(20f)
             R.id.radio_size_standard -> viewModel.updateSavedOverlayHeight(25f)
             R.id.radio_size_large -> viewModel.updateSavedOverlayHeight(30f)
         } }
-        binding.sliderOverlayAlpha.addOnChangeListener { _, value, fromUser ->
-            if (fromUser && !applyingState) viewModel.updateOverlayAlpha(value / 100f)
-        }
+        binding.sliderOverlayAlpha.addOnChangeListener { _, value, fromUser -> if (fromUser && !applyingState) viewModel.updateOverlayAlpha(value / 100f) }
         binding.groupTheme.setOnCheckedChangeListener { _, id -> if (!applyingState) when (id) {
             R.id.radio_theme_dark -> viewModel.updateStampTheme(StampTheme.DARK)
             R.id.radio_theme_light -> viewModel.updateStampTheme(StampTheme.LIGHT)
@@ -139,119 +130,81 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
     private fun applyState(config: StampConfig) {
         applyingState = true
         try {
+            if (config.savedStampLayout != SavedStampLayout.CARD) {
+                // Migrate any previously persisted Strip/Footer selection to Card.
+                viewModel.updateSavedStampLayout(SavedStampLayout.CARD)
+            }
+            val cardConfig = if (config.savedStampLayout == SavedStampLayout.CARD) config else config.copy(savedStampLayout = SavedStampLayout.CARD)
             applyShellTheme()
-            applySegmentTheme(config.stampTheme)
-
+            applySegmentTheme(cardConfig.stampTheme)
             val radius = viewModel.remoteAppConfig.value.policy.siteDetectionRadiusM
             binding.tvRadiusValue.text = if (radius >= 1000) "${String.format("%.1f", radius / 1000.0)} km" else "${radius.toInt()} m"
             binding.tvSiteSummary.text = "Axiom Infratech · Site match ${binding.tvRadiusValue.text}"
             binding.tvOrganization.text = viewModel.remoteAppConfig.value.organization.name.ifBlank { "Axiom Infratech" }
             binding.tvOrgLogic.text = "Automatic from verified site/session"
-
-            binding.radioLayoutCard.isChecked = config.savedStampLayout == SavedStampLayout.CARD
-            binding.radioLayoutStrip.isChecked = config.savedStampLayout == SavedStampLayout.STRIP
-            binding.radioLayoutFooter.isChecked = config.savedStampLayout == SavedStampLayout.FOOTER
-
-            val size = nearestSize(config.savedOverlayHeightFraction)
+            binding.radioLayoutCard.isChecked = true
+            binding.radioLayoutStrip.isChecked = false
+            binding.radioLayoutFooter.isChecked = false
+            val size = nearestSize(cardConfig.savedOverlayHeightFraction)
             binding.radioSizeCompact.isChecked = size == 20
             binding.radioSizeStandard.isChecked = size == 25
             binding.radioSizeLarge.isChecked = size == 30
-
-            val alpha = (config.overlayAlpha * 100f).coerceIn(20f, 90f)
+            val alpha = (cardConfig.overlayAlpha * 100f).coerceIn(20f, 90f)
             binding.sliderOverlayAlpha.value = alpha
             binding.tvAlphaValue.text = "${alpha.toInt()}%"
-            binding.radioThemeDark.isChecked = config.stampTheme == StampTheme.DARK
-            binding.radioThemeLight.isChecked = config.stampTheme == StampTheme.LIGHT
-
-            binding.radioLiveFloating.isChecked = config.liveInfoMode == LiveInfoMode.FLOATING
-            binding.radioLiveBottom.isChecked = config.liveInfoMode == LiveInfoMode.BOTTOM
-            binding.radioLiveOff.isChecked = config.liveInfoMode == LiveInfoMode.OFF
-            binding.tvCameraSummary.text = when (config.liveInfoMode) {
+            binding.radioThemeDark.isChecked = cardConfig.stampTheme == StampTheme.DARK
+            binding.radioThemeLight.isChecked = cardConfig.stampTheme == StampTheme.LIGHT
+            binding.radioLiveFloating.isChecked = cardConfig.liveInfoMode == LiveInfoMode.FLOATING
+            binding.radioLiveBottom.isChecked = cardConfig.liveInfoMode == LiveInfoMode.BOTTOM
+            binding.radioLiveOff.isChecked = cardConfig.liveInfoMode == LiveInfoMode.OFF
+            binding.tvCameraSummary.text = when (cardConfig.liveInfoMode) {
                 LiveInfoMode.FLOATING -> "Floating Info Card"
                 LiveInfoMode.BOTTOM -> "Bottom Info Strip"
                 LiveInfoMode.OFF -> "Off"
             }
-            binding.switchBlockSpoof.isChecked = config.blockIfSpoofDetected
-            binding.tvProtectionSummary.text = if (config.blockIfSpoofDetected) "Capture blocked on untrusted location" else "Location trust protection"
+            binding.switchBlockSpoof.isChecked = cardConfig.blockIfSpoofDetected
+            binding.tvProtectionSummary.text = if (cardConfig.blockIfSpoofDetected) "Capture blocked on untrusted location" else "Location trust protection"
             binding.tvProtectionManaged.text = "Available for this device/session"
-            binding.tvSavedSummary.text = "${layoutLabel(config.savedStampLayout)} · ${sizeLabel(size)} · ${alpha.toInt()}% · ${if (config.stampTheme == StampTheme.DARK) "Dark" else "Light"}"
-
-            refreshPreview(config)
+            binding.tvSavedSummary.text = "Card · ${sizeLabel(size)} · ${alpha.toInt()}% · ${if (cardConfig.stampTheme == StampTheme.DARK) "Dark" else "Light"}"
+            refreshPreview(cardConfig)
         } finally { applyingState = false }
     }
 
     private fun nearestSize(fraction: Float): Int = listOf(20, 25, 30).minByOrNull { abs(it / 100f - fraction) } ?: 25
     private fun sizeLabel(size: Int) = when (size) { 20 -> "Compact"; 30 -> "Large"; else -> "Standard" }
-    private fun layoutLabel(layout: SavedStampLayout) = when (layout) { SavedStampLayout.CARD -> "Card"; SavedStampLayout.STRIP -> "Strip"; SavedStampLayout.FOOTER -> "Footer" }
 
     private fun refreshPreview(config: StampConfig) {
         val density = resources.displayMetrics.density
-        val light = config.stampTheme == StampTheme.LIGHT
-        val primary = if (light) Color.parseColor("#0B1830") else Color.WHITE
-        val secondary = if (light) Color.parseColor("#64748B") else Color.parseColor("#CBD5E1")
-        val divider = if (light) Color.parseColor("#CBD5E1") else Color.parseColor("#233651")
-        val border = if (light) Color.parseColor("#CBD7E5") else Color.parseColor("#233651")
-        val surface = if (light) Color.WHITE else Color.rgb(8, 12, 18)
-        val size = config.savedOverlayHeightFraction.coerceIn(0.20f, 0.30f)
-        val sizeMultiplier = size / 0.25f
-
-        // Fixed camera-like preview. Only the stamp geometry changes.
+        val primary = if (config.stampTheme == StampTheme.LIGHT) Color.parseColor("#0B1830") else Color.WHITE
+        val secondary = if (config.stampTheme == StampTheme.LIGHT) Color.parseColor("#64748B") else Color.parseColor("#CBD5E1")
+        val border = if (config.stampTheme == StampTheme.LIGHT) Color.parseColor("#CBD7E5") else Color.parseColor("#233651")
+        val surface = if (config.stampTheme == StampTheme.LIGHT) Color.WHITE else Color.rgb(8, 12, 18)
+        val sizeMultiplier = config.savedOverlayHeightFraction.coerceIn(0.20f, 0.30f) / 0.25f
         binding.previewFrame.layoutParams = binding.previewFrame.layoutParams.apply { height = (250f * density).toInt() }
         binding.previewFrame.setBackgroundColor(Color.rgb(38, 43, 48))
-
-        val stampH = when (config.savedStampLayout) {
-            SavedStampLayout.CARD -> 180f * sizeMultiplier
-            SavedStampLayout.STRIP -> 92f * sizeMultiplier
-            SavedStampLayout.FOOTER -> 54f * sizeMultiplier
-        }.coerceIn(42f, 210f)
         binding.overlayPreviewCard.layoutParams = binding.overlayPreviewCard.layoutParams.apply {
             width = ViewGroup.LayoutParams.MATCH_PARENT
-            height = (stampH * density).toInt()
+            height = (180f * sizeMultiplier * density).toInt().coerceIn((42*density).toInt(), (210*density).toInt())
         }
         binding.overlayPreviewCard.setPadding((12*density).toInt(), (10*density).toInt(), (12*density).toInt(), (10*density).toInt())
-
-        val alpha = (config.overlayAlpha * 255f).toInt().coerceIn(50, 230)
         binding.overlayPreviewCard.background = GradientDrawable().apply {
-            cornerRadius = if (config.savedStampLayout == SavedStampLayout.FOOTER) 8f*density else 16f*density
-            setColor(Color.argb(alpha, Color.red(surface), Color.green(surface), Color.blue(surface)))
+            cornerRadius = 16f*density
+            setColor(Color.argb((config.overlayAlpha * 255f).toInt().coerceIn(50,230), Color.red(surface), Color.green(surface), Color.blue(surface)))
             setStroke((1*density).toInt().coerceAtLeast(1), border)
         }
-
-        when (config.savedStampLayout) {
-            SavedStampLayout.CARD -> {
-                binding.previewStatus.visibility = View.VISIBLE
-                binding.previewCoords.visibility = View.VISIBLE
-                binding.previewTime.visibility = View.VISIBLE
-                binding.previewSite.visibility = View.VISIBLE
-                binding.previewStatus.text = "✓  LOCATION VERIFIED"
-                binding.previewCoords.text = "24.8610° N, 67.0101° E"
-                binding.previewTime.text = "02 May 2026  ·  14:30  ·  ±5m"
-                binding.previewSite.text = "SITE ID  PKZ-KHI-001   •   Evidence ID"
-            }
-            SavedStampLayout.STRIP -> {
-                binding.previewStatus.visibility = View.GONE
-                binding.previewCoords.visibility = View.VISIBLE
-                binding.previewTime.visibility = View.VISIBLE
-                binding.previewSite.visibility = View.VISIBLE
-                binding.previewCoords.text = "24.8610° N, 67.0101° E"
-                binding.previewTime.text = "PKZ-KHI-001  •  14:30"
-                binding.previewSite.text = "CAPTURE SEALED  •  Evidence ID"
-            }
-            SavedStampLayout.FOOTER -> {
-                binding.previewStatus.visibility = View.GONE
-                binding.previewCoords.visibility = View.GONE
-                binding.previewTime.visibility = View.VISIBLE
-                binding.previewSite.visibility = View.VISIBLE
-                binding.previewTime.text = "GeoStamp  •  PKZ-KHI-001"
-                binding.previewSite.text = "Evidence ID  •  CAPTURE SEALED"
-            }
-        }
-
+        binding.previewStatus.visibility = View.VISIBLE
+        binding.previewCoords.visibility = View.VISIBLE
+        binding.previewTime.visibility = View.VISIBLE
+        binding.previewSite.visibility = View.VISIBLE
+        binding.previewStatus.text = "✓  LOCATION VERIFIED"
+        binding.previewCoords.text = "24.8610° N, 67.0101° E"
+        binding.previewTime.text = "02 May 2026  ·  14:30  ·  ±5 m"
+        binding.previewSite.text = "SITE ID  PKZ-KHI-001   •   Evidence ID"
         binding.previewStatus.setTextColor(Color.rgb(34,197,94))
         binding.previewCoords.setTextColor(primary)
         binding.previewTime.setTextColor(secondary)
         binding.previewSite.setTextColor(Color.parseColor("#8B5CF6"))
-        binding.overlayPreviewCard.contentDescription = "${layoutLabel(config.savedStampLayout)} ${sizeLabel(nearestSize(config.savedOverlayHeightFraction))} ${config.stampTheme.name} stamp preview; divider ${String.format("#%06X", 0xFFFFFF and divider)}"
+        binding.overlayPreviewCard.contentDescription = "Card ${sizeLabel(nearestSize(config.savedOverlayHeightFraction))} ${config.stampTheme.name} stamp preview"
         binding.previewFrame.requestLayout()
         binding.overlayPreviewCard.requestLayout()
     }
@@ -260,23 +213,18 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
         binding.stampSettingsRoot.setBackgroundColor(Color.parseColor("#07101F"))
         binding.tvTitle.setTextColor(Color.parseColor("#F5F7FA"))
         binding.tvSubtitle.setTextColor(Color.parseColor("#A9B6C8"))
-        binding.tvAutoSave.setTextColor(Color.parseColor("#A9B6C8"))
         val fill = Color.parseColor("#111D2D")
         val border = Color.parseColor("#233651")
         listOf(binding.sectionSiteHeader,binding.sectionSavedHeader,binding.sectionInfoHeader,binding.sectionCameraHeader,binding.sectionProtectionHeader,
             binding.sectionSiteContent,binding.sectionSavedContent,binding.sectionInfoContent,binding.sectionCameraContent,binding.sectionProtectionContent).forEach {
-            it.background = GradientDrawable().apply { cornerRadius = 16f*resources.displayMetrics.density; setColor(fill); setStroke(1, border) }
+            it.background = GradientDrawable().apply { cornerRadius = 16f*resources.displayMetrics.density; setColor(fill); setStroke(1,border) }
             styleTree(it)
         }
-        val d = resources.displayMetrics.density
-        binding.sectionSavedHeader.background = GradientDrawable().apply { cornerRadii=floatArrayOf(16*d,16*d,16*d,16*d,0f,0f,0f,0f); setColor(fill); setStroke(1,border) }
-        binding.sectionSavedContent.background = GradientDrawable().apply { cornerRadii=floatArrayOf(0f,0f,0f,0f,16*d,16*d,16*d,16*d); setColor(fill); setStroke(1,border) }
     }
 
     private fun styleTree(root: View) {
         if (root is TextView) root.setTextColor(when {
             root.id == R.id.tv_site_title || root.id == R.id.tv_saved_summary || root.id == R.id.tv_info_summary || root.id == R.id.tv_camera_summary || root.id == R.id.tv_protection_summary -> Color.parseColor("#19A9DC")
-            root.text.toString().contains("Managed", true) || root.text.toString().contains("Required", true) -> Color.parseColor("#A9B6C8")
             else -> Color.parseColor("#F5F7FA")
         })
         if (root is ViewGroup) for (i in 0 until root.childCount) styleTree(root.getChildAt(i))
@@ -292,10 +240,9 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
         listOf(binding.groupLayout,binding.groupSize,binding.groupTheme,binding.groupLiveInfo).forEach { group ->
             for (i in 0 until group.childCount) {
                 val button = group.getChildAt(i) as? RadioButton ?: continue
-                val r = 5f * resources.displayMetrics.density
-                val checked = GradientDrawable().apply { cornerRadius=r; setColor(selectedBg); setStroke(1,selectedBg) }
-                val normal = GradientDrawable().apply { cornerRadius=r; setColor(normalBg); setStroke(1,border) }
-                button.background = StateListDrawable().apply {
+                val checked = GradientDrawable().apply { cornerRadius=5f*resources.displayMetrics.density; setColor(selectedBg); setStroke(1,selectedBg) }
+                val normal = GradientDrawable().apply { cornerRadius=5f*resources.displayMetrics.density; setColor(normalBg); setStroke(1,border) }
+                button.background = android.graphics.drawable.StateListDrawable().apply {
                     addState(intArrayOf(android.R.attr.state_checked), checked)
                     addState(intArrayOf(), normal)
                 }

@@ -58,12 +58,14 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
     }
 
     private fun hideRemovedLayouts() {
-        // Card is now the only saved-photo layout exposed to users.
+        // Card is the only saved-photo layout. Keep the Card control full-width;
+        // setting its width to 0 makes the only remaining option effectively disappear.
         binding.radioLayoutStrip.visibility = View.GONE
         binding.radioLayoutFooter.visibility = View.GONE
+        binding.radioLayoutCard.visibility = View.VISIBLE
         binding.radioLayoutCard.layoutParams = binding.radioLayoutCard.layoutParams.apply {
-            width = 0
-            (this as? android.widget.LinearLayout.LayoutParams)?.weight = 1f
+            width = ViewGroup.LayoutParams.MATCH_PARENT
+            (this as? android.widget.LinearLayout.LayoutParams)?.weight = 0f
         }
         binding.radioLayoutCard.text = "Card"
     }
@@ -131,7 +133,6 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
         applyingState = true
         try {
             if (config.savedStampLayout != SavedStampLayout.CARD) {
-                // Migrate any previously persisted Strip/Footer selection to Card.
                 viewModel.updateSavedStampLayout(SavedStampLayout.CARD)
             }
             val cardConfig = if (config.savedStampLayout == SavedStampLayout.CARD) config else config.copy(savedStampLayout = SavedStampLayout.CARD)

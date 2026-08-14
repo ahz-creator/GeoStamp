@@ -20,6 +20,7 @@ import com.axiominfratech.geostamp.R
 import com.axiominfratech.geostamp.databinding.FragmentStampOptionsBinding
 import com.axiominfratech.geostamp.overlay.LiveInfoMode
 import com.axiominfratech.geostamp.overlay.SavedStampLayout
+import com.axiominfratech.geostamp.overlay.StampConfig
 import com.axiominfratech.geostamp.overlay.StampTheme
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -28,47 +29,86 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
     private var _binding: FragmentStampOptionsBinding? = null
     private val binding get() = _binding!!
     private val viewModel: MainViewModel by activityViewModels()
-
-    private enum class Section { SITE, SAVED, INFO, CAMERA, PROTECTION }
-    private var openSection = Section.SAVED
     private var applyingState = false
 
-    private data class Tokens(
-        val page: Int, val card: Int, val border: Int, val primary: Int,
-        val secondary: Int, val accent: Int, val preview: Int
-    )
-
-    private fun tokens(theme: StampTheme) = if (theme == StampTheme.LIGHT) Tokens(
-        Color.parseColor("#07101F"), Color.parseColor("#111D2D"), Color.parseColor("#233651"),
-        Color.parseColor("#F5F7FA"), Color.parseColor("#A9B6C8"), Color.parseColor("#19A9DC"), Color.BLACK
-    ) else Tokens(
-        Color.parseColor("#07101F"), Color.parseColor("#111D2D"), Color.parseColor("#233651"),
-        Color.parseColor("#F5F7FA"), Color.parseColor("#A9B6C8"), Color.parseColor("#19A9DC"), Color.BLACK
-    )
+    private enum class Section { SITE, SAVED, INFO, CAMERA, PROTECTION }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         _binding = FragmentStampOptionsBinding.bind(view)
 
-        // The application shell stays dark. Stamp Theme never changes the app chrome.
-        binding.btnBack.imageTintList = ColorStateList.valueOf(
-            ContextCompat.getColor(requireContext(), R.color.text_primary)
-        )
+        binding.btnBack.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.text_primary))
         binding.btnBack.setOnClickListener { parentFragmentManager.popBackStack() }
 
-        listOf(
-            binding.sectionSiteHeader to Section.SITE,
-            binding.sectionSavedHeader to Section.SAVED,
-            binding.sectionInfoHeader to Section.INFO,
-            binding.sectionCameraHeader to Section.CAMERA,
-            binding.sectionProtectionHeader to Section.PROTECTION
-        ).forEach { (header, section) -> header.setOnClickListener { setOpenSection(section, true) } }
-        binding.sectionSavedContent.post { setOpenSection(Section.SAVED, false) }
-
-        renameStampThemeLabel()
-        setupConnectedSavedAccordion()
+        bindAccordions()
+        bindControls()
         setupAutoSaveInset()
 
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.stampConfig.collect { applyState(it) }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.uiState.collect { state ->
+                val match = state.siteMatch
+                binding.tvSiteStatus.text = when {
+                    state.gpsStatus == MainViewModel.GpsStatus.SPOOFED -> "Location trust warning detected"
+                    match?.site != null -> "Matched: ${match.site.siteId} · ${match.distanceM.toInt()} m"
+                    else -> "Waiting for a verified site match"
+                }
+            }
+        }
+    }
+
+    private fun bindAccordions() {
+        val sections = listOf(
+            binding.sectionSiteHeader to Pair(Section.SITE, binding.sectionSiteContent),
+            binding.sectionSavedHeader to Pair(Section.SAVED, binding.sectionSavedContent),
+            binding.sectionInfoHeader to Pair(Section.INFO, binding.sectionInfoContent),
+            binding.sectionCameraHeader to Pair(Section.CAMERA, binding.sectionCameraContent),
+            binding.sectionProtectionHeader to Pair(Section.PROTECTION, binding.sectionProtectionContent)
+        )
+        sections.forEach { (header, pair) -> header.setOnClickListener { openSection(pair.first) } }
+        binding.sectionSavedContent.post { openSection(Section.SAVED, false) }
+
+        binding.sectionSavedHeader.layoutParams = binding.sectionSavedHeader.layoutParams.apply {
+            if (this is ViewGroup.MarginLayoutParams) bottomMargin = 0
+        }
+        binding.sectionSavedContent.layoutParams = binding.sectionSavedContent.layoutParams.apply {
+            if (this is ViewGroup.MarginLayoutParams) topMargin = 0
+        }
+
+        fun rename(v: View) {
+            if (v is TextView && v.text.toString().trim().equals("Theme", true)) v.text = "STAMP THEME"
+            if (v is ViewGroup) for (i in 0 until v.childCount) rename(v.getChildAt(i))
+        }
+        rename(binding.sectionSavedContent)
+    }
+
+    private fun openSection(section: Section, animate: Boolean = true) {
+        val pairs = listOf(
+            Section.SITE to binding.sectionSiteContent,
+            Section.SAVED to binding.sectionSavedContent,
+            Section.INFO to binding.sectionInfoContent,
+            Section.CAMERA to binding.sectionCameraContent,
+            Section.PROTECTION to binding.sectionProtectionContent
+        )
+        if (animate) (binding.sectionSavedContent.parent as? ViewGroup)?.layoutTransition = LayoutTransition().apply {
+            enableTransitionType(LayoutTransition.CHANGING)
+        }
+        pairs.forEach { (key, content) ->
+            val show = key == section
+            content.animate().cancel()
+            content.visibility = if (show) View.VISIBLE else View.GONE
+            content.alpha = 1f
+        }
+        binding.tvSiteChevron.text = if (section == Section.SITE) "⌃" else "⌄"
+        binding.tvSavedChevron.text = if (section == Section.SAVED) "⌃" else "⌄"
+        binding.tvInfoChevron.text = if (section == Section.INFO) "⌃" else "⌄"
+        binding.tvCameraChevron.text = if (section == Section.CAMERA) "⌃" else "⌄"
+        binding.tvProtectionChevron.text = if (section == Section.PROTECTION) "⌃" else "⌄"
+    }
+
+    private fun bindControls() {
         binding.groupLayout.setOnCheckedChangeListener { _, id -> if (!applyingState) when (id) {
             R.id.radio_layout_card -> viewModel.updateSavedStampLayout(SavedStampLayout.CARD)
             R.id.radio_layout_strip -> viewModel.updateSavedStampLayout(SavedStampLayout.STRIP)
@@ -94,118 +134,17 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
         binding.switchBlockSpoof.setOnCheckedChangeListener { _, checked ->
             if (!applyingState) viewModel.updateStampConfig(viewModel.stampConfig.value.copy(blockIfSpoofDetected = checked))
         }
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.stampConfig.collect { applyState(it) }
-        }
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.uiState.collect { state ->
-                val match = state.siteMatch
-                binding.tvSiteStatus.text = when {
-                    state.gpsStatus == MainViewModel.GpsStatus.SPOOFED -> "Location trust warning detected"
-                    match?.site != null -> "Matched: ${match.site.siteId} · ${match.distanceM.toInt()} m"
-                    else -> "Waiting for a verified site match"
-                }
-            }
-        }
     }
 
-    private fun renameStampThemeLabel() {
-        fun walk(v: View) {
-            if (v is TextView && v.text.toString().trim().equals("Theme", ignoreCase = true)) {
-                v.text = "STAMP THEME"
-            }
-            if (v is ViewGroup) for (i in 0 until v.childCount) walk(v.getChildAt(i))
-        }
-        walk(binding.sectionSavedContent)
-    }
-
-    private fun setupConnectedSavedAccordion() {
-        binding.sectionSavedHeader.layoutParams = binding.sectionSavedHeader.layoutParams.apply {
-            if (this is ViewGroup.MarginLayoutParams) bottomMargin = 0
-        }
-        binding.sectionSavedContent.layoutParams = binding.sectionSavedContent.layoutParams.apply {
-            if (this is ViewGroup.MarginLayoutParams) topMargin = 0
-        }
-        binding.sectionSavedContent.setPadding(
-            binding.sectionSavedContent.paddingLeft,
-            binding.sectionSavedContent.paddingTop,
-            binding.sectionSavedContent.paddingRight,
-            binding.sectionSavedContent.paddingBottom
-        )
-    }
-
-    private fun setupAutoSaveInset() {
-        val scroll = binding.settingsScroll
-        val content = scroll.getChildAt(0) as? ViewGroup ?: return
-        val autoSave = binding.tvAutoSave
-
-        // Keep the save notice inside the scrollable content so it can never float over
-        // the preview or the last accordion.
-        if (autoSave.parent !== content) {
-            (autoSave.parent as? ViewGroup)?.removeView(autoSave)
-            content.addView(autoSave)
-        }
-
-        autoSave.layoutParams = android.widget.LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply {
-            topMargin = 16.dpToPx()
-            bottomMargin = 16.dpToPx()
-        }
-
-        ViewCompat.setOnApplyWindowInsetsListener(scroll) { _, insets ->
-            val navBottom = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
-            scroll.setPadding(scroll.paddingLeft, scroll.paddingTop, scroll.paddingRight, navBottom)
-            autoSave.layoutParams = autoSave.layoutParams.apply {
-                if (this is ViewGroup.MarginLayoutParams) bottomMargin = navBottom + 16.dpToPx()
-            }
-            insets
-        }
-        ViewCompat.requestApplyInsets(scroll)
-    }
-
-    private fun setOpenSection(section: Section, animate: Boolean) {
-        openSection = section
-        val pairs = listOf(
-            Section.SITE to binding.sectionSiteContent,
-            Section.SAVED to binding.sectionSavedContent,
-            Section.INFO to binding.sectionInfoContent,
-            Section.CAMERA to binding.sectionCameraContent,
-            Section.PROTECTION to binding.sectionProtectionContent
-        )
-        if (animate) binding.sectionSavedContent.parent?.let { (it as? ViewGroup)?.layoutTransition = LayoutTransition().apply {
-            enableTransitionType(LayoutTransition.CHANGING)
-        } }
-        pairs.forEach { (key, content) ->
-            val show = key == section
-            if (show && content.visibility != View.VISIBLE) {
-                content.alpha = 0f
-                content.visibility = View.VISIBLE
-                content.animate().alpha(1f).setDuration(180).start()
-            } else if (!show) {
-                content.animate().alpha(0f).setDuration(120).withEndAction { content.visibility = View.GONE }.start()
-            }
-        }
-        binding.tvSiteChevron.text = if (section == Section.SITE) "⌃" else "⌄"
-        binding.tvSavedChevron.text = if (section == Section.SAVED) "⌃" else "⌄"
-        binding.tvInfoChevron.text = if (section == Section.INFO) "⌃" else "⌄"
-        binding.tvCameraChevron.text = if (section == Section.CAMERA) "⌃" else "⌄"
-        binding.tvProtectionChevron.text = if (section == Section.PROTECTION) "⌃" else "⌄"
-    }
-
-    private fun applyState(config: com.axiominfratech.geostamp.overlay.StampConfig) {
+    private fun applyState(config: StampConfig) {
         applyingState = true
         try {
-            val shell = tokens(StampTheme.DARK)
-            applyTokens(shell)
+            applyShellTheme()
             applySegmentTheme(config.stampTheme)
 
             val radius = viewModel.remoteAppConfig.value.policy.siteDetectionRadiusM
-            val radiusLabel = if (radius >= 1000) "${(radius / 1000).let { if (it % 1.0 == 0.0) it.toInt() else String.format("%.1f", it) }} km" else "${radius.toInt()} m"
-            binding.tvRadiusValue.text = radiusLabel
-            binding.tvSiteSummary.text = "Axiom Infratech · Site match $radiusLabel"
+            binding.tvRadiusValue.text = if (radius >= 1000) "${String.format("%.1f", radius / 1000.0)} km" else "${radius.toInt()} m"
+            binding.tvSiteSummary.text = "Axiom Infratech · Site match ${binding.tvRadiusValue.text}"
             binding.tvOrganization.text = viewModel.remoteAppConfig.value.organization.name.ifBlank { "Axiom Infratech" }
             binding.tvOrgLogic.text = "Automatic from verified site/session"
 
@@ -213,15 +152,14 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
             binding.radioLayoutStrip.isChecked = config.savedStampLayout == SavedStampLayout.STRIP
             binding.radioLayoutFooter.isChecked = config.savedStampLayout == SavedStampLayout.FOOTER
 
-            val nearest = nearestHeight(config.savedOverlayHeightFraction)
-            binding.radioSizeCompact.isChecked = nearest == 20
-            binding.radioSizeStandard.isChecked = nearest == 25
-            binding.radioSizeLarge.isChecked = nearest == 30
+            val size = nearestSize(config.savedOverlayHeightFraction)
+            binding.radioSizeCompact.isChecked = size == 20
+            binding.radioSizeStandard.isChecked = size == 25
+            binding.radioSizeLarge.isChecked = size == 30
 
-            val alphaPercent = (config.overlayAlpha * 100f).coerceIn(20f, 90f)
-            binding.sliderOverlayAlpha.value = alphaPercent
-            binding.tvAlphaValue.text = "${alphaPercent.toInt()}%"
-
+            val alpha = (config.overlayAlpha * 100f).coerceIn(20f, 90f)
+            binding.sliderOverlayAlpha.value = alpha
+            binding.tvAlphaValue.text = "${alpha.toInt()}%"
             binding.radioThemeDark.isChecked = config.stampTheme == StampTheme.DARK
             binding.radioThemeLight.isChecked = config.stampTheme == StampTheme.LIGHT
 
@@ -233,181 +171,149 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
                 LiveInfoMode.BOTTOM -> "Bottom Info Strip"
                 LiveInfoMode.OFF -> "Off"
             }
-
             binding.switchBlockSpoof.isChecked = config.blockIfSpoofDetected
             binding.tvProtectionSummary.text = if (config.blockIfSpoofDetected) "Capture blocked on untrusted location" else "Location trust protection"
             binding.tvProtectionManaged.text = "Available for this device/session"
+            binding.tvSavedSummary.text = "${layoutLabel(config.savedStampLayout)} · ${sizeLabel(size)} · ${alpha.toInt()}% · ${if (config.stampTheme == StampTheme.DARK) "Dark" else "Light"}"
 
-            binding.tvSavedSummary.text = "${layoutLabel(config.savedStampLayout)} · ${sizeLabel(nearest)} · ${alphaPercent.toInt()}% · ${if (config.stampTheme == StampTheme.DARK) "Dark" else "Light"}"
-            refreshPreview(config, config.stampTheme)
+            refreshPreview(config)
         } finally { applyingState = false }
     }
 
-    private fun nearestHeight(fraction: Float): Int = listOf(20,25,30).minByOrNull { abs(it/100f-fraction) } ?: 25
-    private fun sizeLabel(v: Int) = when(v) {20->"Compact";30->"Large";else->"Standard"}
-    private fun layoutLabel(v: SavedStampLayout) = when(v) { SavedStampLayout.CARD->"Card"; SavedStampLayout.STRIP->"Strip"; SavedStampLayout.FOOTER->"Footer" }
+    private fun nearestSize(fraction: Float): Int = listOf(20, 25, 30).minByOrNull { abs(it / 100f - fraction) } ?: 25
+    private fun sizeLabel(size: Int) = when (size) { 20 -> "Compact"; 30 -> "Large"; else -> "Standard" }
+    private fun layoutLabel(layout: SavedStampLayout) = when (layout) { SavedStampLayout.CARD -> "Card"; SavedStampLayout.STRIP -> "Strip"; SavedStampLayout.FOOTER -> "Footer" }
 
-    private fun refreshPreview(config: com.axiominfratech.geostamp.overlay.StampConfig, theme: StampTheme) {
-        val light = theme == StampTheme.LIGHT
+    private fun refreshPreview(config: StampConfig) {
+        val density = resources.displayMetrics.density
+        val light = config.stampTheme == StampTheme.LIGHT
         val primary = if (light) Color.parseColor("#0B1830") else Color.WHITE
         val secondary = if (light) Color.parseColor("#64748B") else Color.parseColor("#CBD5E1")
         val divider = if (light) Color.parseColor("#CBD5E1") else Color.parseColor("#233651")
         val border = if (light) Color.parseColor("#CBD7E5") else Color.parseColor("#233651")
-        val previewBg = Color.BLACK
-        val density = resources.displayMetrics.density
+        val surface = if (light) Color.WHITE else Color.rgb(8, 12, 18)
+        val size = config.savedOverlayHeightFraction.coerceIn(0.20f, 0.30f)
+        val sizeMultiplier = size / 0.25f
 
-        val frameHeightDp = when (config.savedStampLayout) {
-            SavedStampLayout.CARD -> 250
-            SavedStampLayout.STRIP -> 175
-            SavedStampLayout.FOOTER -> 135
-        }
-        val stampHeightDp = when (config.savedStampLayout) {
-            SavedStampLayout.CARD -> 180
-            SavedStampLayout.STRIP -> 92
-            SavedStampLayout.FOOTER -> 60
-        }
-        binding.previewFrame.layoutParams = binding.previewFrame.layoutParams.apply {
-            height = (frameHeightDp * density).toInt()
-        }
-        binding.previewFrame.setBackgroundColor(previewBg)
+        // Fixed camera-like preview. Only the stamp geometry changes.
+        binding.previewFrame.layoutParams = binding.previewFrame.layoutParams.apply { height = (250f * density).toInt() }
+        binding.previewFrame.setBackgroundColor(Color.rgb(38, 43, 48))
 
+        val stampH = when (config.savedStampLayout) {
+            SavedStampLayout.CARD -> 180f * sizeMultiplier
+            SavedStampLayout.STRIP -> 92f * sizeMultiplier
+            SavedStampLayout.FOOTER -> 54f * sizeMultiplier
+        }.coerceIn(42f, 210f)
         binding.overlayPreviewCard.layoutParams = binding.overlayPreviewCard.layoutParams.apply {
-            height = (stampHeightDp * density).toInt()
+            width = ViewGroup.LayoutParams.MATCH_PARENT
+            height = (stampH * density).toInt()
         }
-        binding.overlayPreviewCard.setPadding(
-            (12 * density).toInt(),
-            (10 * density).toInt(),
-            (12 * density).toInt(),
-            (10 * density).toInt()
-        )
+        binding.overlayPreviewCard.setPadding((12*density).toInt(), (10*density).toInt(), (12*density).toInt(), (10*density).toInt())
 
-        val bg = GradientDrawable().apply {
-            cornerRadius = 16f * density
-            val a = (config.overlayAlpha * 255).toInt().coerceIn(50, 230)
-            val surface = if (light) Color.WHITE else Color.rgb(8, 12, 18)
-            setColor(Color.argb(a, Color.red(surface), Color.green(surface), Color.blue(surface)))
-            setStroke((1f * density).toInt().coerceAtLeast(1), border)
+        val alpha = (config.overlayAlpha * 255f).toInt().coerceIn(50, 230)
+        binding.overlayPreviewCard.background = GradientDrawable().apply {
+            cornerRadius = if (config.savedStampLayout == SavedStampLayout.FOOTER) 8f*density else 16f*density
+            setColor(Color.argb(alpha, Color.red(surface), Color.green(surface), Color.blue(surface)))
+            setStroke((1*density).toInt().coerceAtLeast(1), border)
         }
-        binding.overlayPreviewCard.background = bg
 
-        binding.previewStatus.setTextColor(Color.rgb(34, 197, 94))
+        when (config.savedStampLayout) {
+            SavedStampLayout.CARD -> {
+                binding.previewStatus.visibility = View.VISIBLE
+                binding.previewCoords.visibility = View.VISIBLE
+                binding.previewTime.visibility = View.VISIBLE
+                binding.previewSite.visibility = View.VISIBLE
+                binding.previewStatus.text = "✓  LOCATION VERIFIED"
+                binding.previewCoords.text = "24.8610° N, 67.0101° E"
+                binding.previewTime.text = "02 May 2026  ·  14:30  ·  ±5m"
+                binding.previewSite.text = "SITE ID  PKZ-KHI-001   •   Evidence ID"
+            }
+            SavedStampLayout.STRIP -> {
+                binding.previewStatus.visibility = View.GONE
+                binding.previewCoords.visibility = View.VISIBLE
+                binding.previewTime.visibility = View.VISIBLE
+                binding.previewSite.visibility = View.VISIBLE
+                binding.previewCoords.text = "24.8610° N, 67.0101° E"
+                binding.previewTime.text = "PKZ-KHI-001  •  14:30"
+                binding.previewSite.text = "CAPTURE SEALED  •  Evidence ID"
+            }
+            SavedStampLayout.FOOTER -> {
+                binding.previewStatus.visibility = View.GONE
+                binding.previewCoords.visibility = View.GONE
+                binding.previewTime.visibility = View.VISIBLE
+                binding.previewSite.visibility = View.VISIBLE
+                binding.previewTime.text = "GeoStamp  •  PKZ-KHI-001"
+                binding.previewSite.text = "Evidence ID  •  CAPTURE SEALED"
+            }
+        }
+
+        binding.previewStatus.setTextColor(Color.rgb(34,197,94))
         binding.previewCoords.setTextColor(primary)
         binding.previewTime.setTextColor(secondary)
         binding.previewSite.setTextColor(Color.parseColor("#8B5CF6"))
-        binding.previewStatus.text = "✓ Location verified"
-        binding.previewCoords.text = "24.8610° N, 67.0101° E"
-        binding.previewTime.text = "02 May 2026, 14:30"
-        binding.previewSite.text = "Site ID: PKZ-KHI-001"
-
-        // Keep the preview visually faithful to the selected stamp theme.
-        binding.overlayPreviewCard.contentDescription = "${theme.name} stamp preview; divider ${String.format("#%06X", 0xFFFFFF and divider)}"
+        binding.overlayPreviewCard.contentDescription = "${layoutLabel(config.savedStampLayout)} ${sizeLabel(nearestSize(config.savedOverlayHeightFraction))} ${config.stampTheme.name} stamp preview; divider ${String.format("#%06X", 0xFFFFFF and divider)}"
+        binding.previewFrame.requestLayout()
+        binding.overlayPreviewCard.requestLayout()
     }
 
-    private fun applyTokens(t: Tokens) {
-        // These tokens are deliberately fixed to the existing dark application shell.
-        // Stamp Theme is NOT an application appearance switch.
+    private fun applyShellTheme() {
         binding.stampSettingsRoot.setBackgroundColor(Color.parseColor("#07101F"))
         binding.tvTitle.setTextColor(Color.parseColor("#F5F7FA"))
         binding.tvSubtitle.setTextColor(Color.parseColor("#A9B6C8"))
         binding.tvAutoSave.setTextColor(Color.parseColor("#A9B6C8"))
+        val fill = Color.parseColor("#111D2D")
+        val border = Color.parseColor("#233651")
+        listOf(binding.sectionSiteHeader,binding.sectionSavedHeader,binding.sectionInfoHeader,binding.sectionCameraHeader,binding.sectionProtectionHeader,
+            binding.sectionSiteContent,binding.sectionSavedContent,binding.sectionInfoContent,binding.sectionCameraContent,binding.sectionProtectionContent).forEach {
+            it.background = GradientDrawable().apply { cornerRadius = 16f*resources.displayMetrics.density; setColor(fill); setStroke(1, border) }
+            styleTree(it)
+        }
+        val d = resources.displayMetrics.density
+        binding.sectionSavedHeader.background = GradientDrawable().apply { cornerRadii=floatArrayOf(16*d,16*d,16*d,16*d,0f,0f,0f,0f); setColor(fill); setStroke(1,border) }
+        binding.sectionSavedContent.background = GradientDrawable().apply { cornerRadii=floatArrayOf(0f,0f,0f,0f,16*d,16*d,16*d,16*d); setColor(fill); setStroke(1,border) }
+    }
 
-        val headers = listOf(binding.sectionSiteHeader,binding.sectionSavedHeader,binding.sectionInfoHeader,binding.sectionCameraHeader,binding.sectionProtectionHeader)
-        val contents = listOf(binding.sectionSiteContent,binding.sectionSavedContent,binding.sectionInfoContent,binding.sectionCameraContent,binding.sectionProtectionContent)
-        headers.forEach { applyCard(it,t.card,t.border); styleTree(it,t) }
-        contents.forEach { applyCard(it,t.card,t.border); styleTree(it,t) }
-
-        // Saved Photo Stamp is one connected rounded accordion.
-        connectAccordion(binding.sectionSavedHeader, binding.sectionSavedContent, t.card, t.border)
+    private fun styleTree(root: View) {
+        if (root is TextView) root.setTextColor(when {
+            root.id == R.id.tv_site_title || root.id == R.id.tv_saved_summary || root.id == R.id.tv_info_summary || root.id == R.id.tv_camera_summary || root.id == R.id.tv_protection_summary -> Color.parseColor("#19A9DC")
+            root.text.toString().contains("Managed", true) || root.text.toString().contains("Required", true) -> Color.parseColor("#A9B6C8")
+            else -> Color.parseColor("#F5F7FA")
+        })
+        if (root is ViewGroup) for (i in 0 until root.childCount) styleTree(root.getChildAt(i))
     }
 
     private fun applySegmentTheme(theme: StampTheme) {
         val light = theme == StampTheme.LIGHT
         val selectedBg = Color.parseColor("#19A9DC")
         val selectedText = Color.parseColor("#07182B")
-        val unselectedBg = Color.parseColor(if (light) "#F4F7FA" else "#0B1424")
-        val unselectedText = Color.parseColor(if (light) "#0B1830" else "#A9B6C8")
+        val normalBg = Color.parseColor(if (light) "#F4F7FA" else "#0B1424")
+        val normalText = Color.parseColor(if (light) "#0B1830" else "#A9B6C8")
         val border = Color.parseColor(if (light) "#CBD7E5" else "#233651")
-
-        val groups = listOf(binding.groupLayout, binding.groupSize, binding.groupTheme, binding.groupLiveInfo)
-        groups.forEach { group ->
+        listOf(binding.groupLayout,binding.groupSize,binding.groupTheme,binding.groupLiveInfo).forEach { group ->
             for (i in 0 until group.childCount) {
                 val button = group.getChildAt(i) as? RadioButton ?: continue
-                val radius = 5f * resources.displayMetrics.density
-                val checked = GradientDrawable().apply {
-                    cornerRadius = radius
-                    setColor(selectedBg)
-                    setStroke((1f * resources.displayMetrics.density).toInt().coerceAtLeast(1), selectedBg)
-                }
-                val normal = GradientDrawable().apply {
-                    cornerRadius = radius
-                    setColor(unselectedBg)
-                    setStroke((1f * resources.displayMetrics.density).toInt().coerceAtLeast(1), border)
-                }
+                val r = 5f * resources.displayMetrics.density
+                val checked = GradientDrawable().apply { cornerRadius=r; setColor(selectedBg); setStroke(1,selectedBg) }
+                val normal = GradientDrawable().apply { cornerRadius=r; setColor(normalBg); setStroke(1,border) }
                 button.background = StateListDrawable().apply {
                     addState(intArrayOf(android.R.attr.state_checked), checked)
                     addState(intArrayOf(), normal)
                 }
-                button.setTextColor(ColorStateList(
-                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                    intArrayOf(selectedText, unselectedText)
-                ))
+                button.setTextColor(ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()), intArrayOf(selectedText,normalText)))
                 button.buttonTintList = null
             }
         }
     }
 
-    private fun connectAccordion(header: View, content: View, fill: Int, stroke: Int) {
-        val density = resources.displayMetrics.density
-        val r = 16f * density
-        val zero = 0f
-        val topCorners = floatArrayOf(r,r,r,r,zero,zero,zero,zero)
-        val bottomCorners = floatArrayOf(zero,zero,zero,zero,r,r,r,r)
-        header.background = GradientDrawable().apply {
-            cornerRadii = topCorners
-            setColor(fill)
-            setStroke((1f * density).toInt().coerceAtLeast(1), stroke)
+    private fun setupAutoSaveInset() {
+        val scroll = binding.settingsScroll
+        ViewCompat.setOnApplyWindowInsetsListener(scroll) { _, insets ->
+            val nav = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+            scroll.setPadding(scroll.paddingLeft, scroll.paddingTop, scroll.paddingRight, nav + (12*resources.displayMetrics.density).toInt())
+            insets
         }
-        content.background = GradientDrawable().apply {
-            cornerRadii = bottomCorners
-            setColor(fill)
-            setStroke((1f * density).toInt().coerceAtLeast(1), stroke)
-        }
-        header.layoutParams = header.layoutParams.apply {
-            if (this is ViewGroup.MarginLayoutParams) {
-                topMargin = 8.dpToPx()
-                bottomMargin = 0
-            }
-        }
-        content.layoutParams = content.layoutParams.apply {
-            if (this is ViewGroup.MarginLayoutParams) {
-                topMargin = 0
-                bottomMargin = 0
-            }
-        }
+        ViewCompat.requestApplyInsets(scroll)
     }
-
-    private fun applyCard(view: View, fill: Int, stroke: Int) {
-        view.background = GradientDrawable().apply {
-            cornerRadius=16f*resources.displayMetrics.density
-            setColor(fill)
-            setStroke((1f*resources.displayMetrics.density).toInt().coerceAtLeast(1),stroke)
-        }
-    }
-
-    private fun styleTree(root: View, t: Tokens) {
-        if (root is TextView) {
-            root.setTextColor(when {
-                root.id == R.id.tv_site_title || root.id == R.id.tv_saved_summary || root.id == R.id.tv_info_summary || root.id == R.id.tv_camera_summary || root.id == R.id.tv_protection_summary -> t.accent
-                root.id == R.id.tv_site_status -> t.primary
-                root.text.toString().contains("REQUIRED") || root.text.toString().contains("OPTIONAL") -> t.accent
-                root.text.toString().contains("Managed") || root.text.toString().contains("Required") -> t.secondary
-                else -> t.primary
-            })
-        }
-        if (root is ViewGroup) for (i in 0 until root.childCount) styleTree(root.getChildAt(i), t)
-    }
-
-    private fun Int.dpToPx() = (this * resources.displayMetrics.density).toInt()
 
     override fun onDestroyView() { super.onDestroyView(); _binding = null }
 }

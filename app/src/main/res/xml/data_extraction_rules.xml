@@ -3,6 +3,8 @@
     <cloud-backup>
         <exclude domain="database" />
         <exclude domain="file" path="GeoStamp_Photos" />
+        <exclude domain="file" path="evidence_registry_outbox" />
+        <exclude domain="file" path="evidence_registry_published" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="database" />

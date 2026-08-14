@@ -11,6 +11,8 @@ import com.axiominfratech.geostamp.database.Operator
  * CUSTOM  = user-picked ARGB via color picker
  */
 enum class LiveInfoMode { FLOATING, BOTTOM, OFF }
+enum class SavedStampLayout { CARD, STRIP, FOOTER }
+enum class StampTheme { DARK, LIGHT }
 
 enum class OverlayColorScheme(val label: String, val baseArgb: Int) {
     BLACK  ("Black Glass",   0x66000000.toInt()),
@@ -29,6 +31,8 @@ data class StampConfig(
     val overlayScale: Float = 1.0f,
     /** Saved-photo overlay height as a fraction of the image; hard-limited to 20–30%. */
     val savedOverlayHeightFraction: Float = 0.25f,
+    val savedStampLayout: SavedStampLayout = SavedStampLayout.CARD,
+    val stampTheme: StampTheme = StampTheme.DARK,
     /** Exactly one live camera information mode may be active. */
     val liveInfoMode: LiveInfoMode = LiveInfoMode.FLOATING,
 

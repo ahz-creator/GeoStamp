@@ -30,6 +30,7 @@ import com.axiominfratech.geostamp.R
 import com.axiominfratech.geostamp.camera.CameraManager
 import com.axiominfratech.geostamp.database.Operator
 import com.axiominfratech.geostamp.overlay.LiveInfoMode
+import com.axiominfratech.geostamp.overlay.StampTheme
 import com.axiominfratech.geostamp.databinding.FragmentCameraBinding
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -161,6 +162,11 @@ class CameraFragment : Fragment() {
 
     private fun requestCaptureWithWorkspaceGuard() {
         val mode = prefs.getString("workspace_mode", "organization") ?: "organization"
+        val stampConfig = viewModel.stampConfig.value
+        if (stampConfig.blockIfSpoofDetected && viewModel.uiState.value.gpsStatus == MainViewModel.GpsStatus.SPOOFED) {
+            Toast.makeText(requireContext(), "Capture blocked: untrusted location detected", Toast.LENGTH_LONG).show()
+            return
+        }
         if (mode == "personal") {
             continueCaptureAfterGuard()
             return
@@ -389,21 +395,42 @@ class CameraFragment : Fragment() {
 
     private fun resolveBaseColor(config: com.axiominfratech.geostamp.overlay.StampConfig): Int {
         val alpha = (config.overlayAlpha.coerceIn(0.2f, 0.9f) * 255).toInt()
-        return if (config.colorScheme == com.axiominfratech.geostamp.overlay.OverlayColorScheme.CUSTOM) {
-            val rgb = config.customColorRgb
-            android.graphics.Color.argb(alpha, (rgb shr 16) and 0xFF, (rgb shr 8) and 0xFF, rgb and 0xFF)
-        } else { val schemeRgb = config.colorScheme.baseArgb and 0x00FFFFFF; (alpha shl 24) or schemeRgb }
+        val rgb = when (config.stampTheme) {
+            StampTheme.DARK -> android.graphics.Color.rgb(8, 12, 18)
+            StampTheme.LIGHT -> android.graphics.Color.rgb(255, 255, 255)
+        }
+        return android.graphics.Color.argb(alpha, android.graphics.Color.red(rgb), android.graphics.Color.green(rgb), android.graphics.Color.blue(rgb))
     }
 
     private fun applyOverlayColor(config: com.axiominfratech.geostamp.overlay.StampConfig) {
         val bgColor = resolveBaseColor(config)
         val cornerPx = 20f * resources.displayMetrics.density
         val pillPx = 100f * resources.displayMetrics.density
-        val stroke = android.graphics.Color.argb(51, 255, 255, 255)
+        val stroke = if (config.stampTheme == StampTheme.LIGHT) android.graphics.Color.argb(110, 11, 24, 48) else android.graphics.Color.argb(70, 255, 255, 255)
         val sw = (1f * resources.displayMetrics.density).toInt()
         binding.infoOverlay.background = GradientDrawable().apply { shape = GradientDrawable.RECTANGLE; setColor(bgColor); cornerRadius = cornerPx; setStroke(sw, stroke) }
+        applyLiveOverlayTextTheme(config)
         binding.infoOverlayCompact.background = GradientDrawable().apply { shape = GradientDrawable.RECTANGLE; setColor(bgColor); cornerRadius = pillPx; setStroke(sw, stroke) }
         try { binding.bottomInfoStrip.background = GradientDrawable().apply { shape = GradientDrawable.RECTANGLE; setColor(bgColor); cornerRadius = pillPx; setStroke(sw, stroke) } } catch (_: Exception) {}
+    }
+
+    private fun applyLiveOverlayTextTheme(config: com.axiominfratech.geostamp.overlay.StampConfig) {
+        val primary = if (config.stampTheme == StampTheme.LIGHT) android.graphics.Color.parseColor("#0B1830") else android.graphics.Color.WHITE
+        val secondary = if (config.stampTheme == StampTheme.LIGHT) android.graphics.Color.parseColor("#64748B") else android.graphics.Color.parseColor("#CBD5E1")
+        listOf(binding.infoOverlay, binding.infoOverlayCompact, binding.bottomInfoStrip).forEach { root ->
+            if (root is android.view.ViewGroup) {
+                fun walk(v: android.view.View) {
+                    when (v) {
+                        is android.widget.TextView -> {
+                            val key = v.contentDescription?.toString().orEmpty()
+                            v.setTextColor(if (key.contains("secondary", true)) secondary else primary)
+                        }
+                        is android.view.ViewGroup -> for (i in 0 until v.childCount) walk(v.getChildAt(i))
+                    }
+                }
+                walk(root)
+            }
+        }
     }
 
     private fun applyOverlayVisibility(config: com.axiominfratech.geostamp.overlay.StampConfig) {

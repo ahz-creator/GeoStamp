@@ -6,6 +6,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.axiominfratech.geostamp.forensics.EvidenceAuditTrail
 
 /**
  * Reliable offline-first registry synchronization.
@@ -44,11 +45,17 @@ class RegistrySyncManager(context: Context) {
 
     suspend fun syncPending(limit: Int = 25): SyncSummary = withContext(Dispatchers.IO) {
         mutex.withLock {
-            val records = EvidenceRegistryOutbox.pending(appContext).take(limit.coerceIn(1, 100))
+            val now = System.currentTimeMillis()
+            val records = EvidenceRegistryOutbox.pending(appContext).filter {
+                val json = runCatching { org.json.JSONObject(it.file.readText()) }.getOrNull()
+                json?.optLong("nextRetryAt", 0L)?.let { retryAt -> retryAt <= now } ?: true
+            }.take(limit.coerceIn(1, 100))
             var published = 0
             var lastMessage = if (records.isEmpty()) "Registry is up to date." else "Sync started."
 
             records.forEach { record ->
+                val json = runCatching { org.json.JSONObject(record.file.readText()) }.getOrNull()
+                val attempt = (json?.optInt("syncAttemptCount", 0) ?: 0) + 1
                 val result = RegistryPublisher.publish(appContext, record.file)
                 lastMessage = result.message
                 if (result.success) {
@@ -59,6 +66,14 @@ class RegistrySyncManager(context: Context) {
                     )
                     published++
                 } else {
+                    val backoffMinutes = (1L shl attempt.coerceIn(0, 6))
+                    EvidenceRegistryOutbox.recordRetry(record.file, attempt, System.currentTimeMillis() + backoffMinutes * 60_000L)
+                    runCatching { EvidenceAuditTrail.append(appContext, EvidenceAuditTrail.Event(
+                        evidenceId = record.verificationId,
+                        type = EvidenceAuditTrail.EventType.REVIEWED,
+                        timestamp = System.currentTimeMillis(),
+                        details = org.json.JSONObject().put("syncAttempt", attempt).put("message", result.message)
+                    )) }
                     // Stop after the first network/server failure. Remaining files stay safe locally.
                     return@forEach
                 }

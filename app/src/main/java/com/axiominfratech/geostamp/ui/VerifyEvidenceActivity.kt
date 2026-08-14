@@ -24,6 +24,7 @@ import com.axiominfratech.geostamp.databinding.ActivityVerifyEvidenceBinding
 import com.axiominfratech.geostamp.verification.EvidencePdfExporter
 import com.axiominfratech.geostamp.verification.EvidenceRegistryOutbox
 import com.axiominfratech.geostamp.verification.EvidenceVisualCache
+import com.axiominfratech.geostamp.verification.EvidenceForensicValidator
 import com.axiominfratech.geostamp.verification.RegistryPublisher
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
@@ -189,19 +190,33 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         val hasVisual = firstNonBlank(
             record.optString("thumbnailBase64"), record.optString("thumbnailJpegBase64"), record.optString("thumb")
         ).isNotBlank()
-        binding.tvResultStatus.text = when {
-            risk -> "REGISTERED · REVIEW REQUIRED"
-            registryBacked && hasVisual -> "VERIFIED · REGISTERED"
-            registryBacked -> "REGISTERED · VISUAL INCOMPLETE"
+        val forensic = EvidenceForensicValidator.validate(record, currentVerificationId)
+        val cryptographicallyValid = forensic.isCryptographicallyValid
+        val status = when {
+            risk -> "REVIEW REQUIRED"
+            forensic.state == EvidenceForensicValidator.State.FAIL -> "INTEGRITY FAILED"
+            registryBacked && hasVisual && cryptographicallyValid -> "VERIFIED · REGISTERED"
+            registryBacked && hasVisual -> "REGISTERED · REVIEW"
+            cryptographicallyValid -> "SEALED · REGISTRY UNCONFIRMED"
+            registryBacked -> "REGISTERED · REVIEW"
             else -> "QR RECORD FOUND"
         }
+        binding.tvResultStatus.text = status
         binding.tvResultStatus.setTextColor(
-            ContextCompat.getColor(this, if (risk) android.R.color.holo_orange_dark else android.R.color.holo_green_dark)
+            ContextCompat.getColor(this, when {
+                status.contains("FAILED") -> android.R.color.holo_red_dark
+                status.contains("REVIEW") || status.contains("UNCONFIRMED") -> android.R.color.holo_orange_dark
+                else -> android.R.color.holo_green_dark
+            })
         )
         binding.tvResultSummary.text = when {
-            risk -> "Registry record found; location-integrity signals require review."
-            registryBacked && !hasVisual -> "Registry record found, but the mandatory evidence visual is unavailable."
-            registryBacked -> "Evidence ID and mandatory visual evidence confirmed for this record."
+            risk -> "Registry record found; location-integrity signals require review before treating the capture as trusted."
+            forensic.state == EvidenceForensicValidator.State.FAIL -> forensic.reasons.firstOrNull { it.startsWith("FAIL") }?.removePrefix("FAIL · ")
+                ?: "One or more integrity checks failed. Review the technical evidence below."
+            registryBacked && hasVisual && cryptographicallyValid -> "Registry, visual evidence, SHA-256 structure and capture signature checks passed."
+            registryBacked && hasVisual -> "Registry record is available, but the local cryptographic evidence needs review."
+            cryptographicallyValid -> "Local cryptographic checks passed. Public registry confirmation is not available for this check."
+            registryBacked -> "Registry record found, but the available cryptographic evidence is incomplete."
             else -> "GeoStamp QR record decoded; public registration is not confirmed."
         }
 
@@ -224,17 +239,19 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         binding.tvResultDetails.text = buildString {
             append("EVIDENCE  •  $id\n")
             append("CAPTURED  •  ${formatTime(capturedAt)}\n")
-            append("OPERATOR  •  $primary\n")
-            append("SITE  •  $secondary\n")
+            append("OPERATOR  •  ${primary.ifBlank { "Unavailable" }}\n")
+            append("SITE  •  ${secondary.ifBlank { "Unassigned" }}\n")
             append("GPS  •  $location\n")
             append("DEVICE  •  $device · $maskedDevice")
-            val aiObjects = firstNonBlank(
-                record.optString("aiObjectCountSummary"),
-                record.optString("aiVisualSummary")
-            )
-            if (aiObjects.isNotBlank()) append("\nAI OBJECTS  •  $aiObjects")
         }
 
+        binding.tvResultBadge.text = when {
+            risk -> "REVIEW REQUIRED"
+            registryBacked && hasVisual -> "VERIFIED"
+            registryBacked -> "REGISTERED"
+            else -> "QR RECORD"
+        }
+        renderVerificationSections(record, registryBacked, risk, hasVisual, id, capturedAt, primary, secondary, lat, lon, accuracy, device, maskedDevice, forensic)
         renderThumbnail(record)
         renderSessionActivity(record, capturedAt, secondary)
         binding.trustCard.visibility = View.GONE
@@ -243,6 +260,90 @@ class VerifyEvidenceActivity : AppCompatActivity() {
         binding.btnViewReport.visibility = if (hasVisual) View.VISIBLE else View.GONE
         binding.btnViewReport.text = "SHARE REPORT · PDF"
         binding.tvError.visibility = View.GONE
+    }
+
+
+    private fun renderVerificationSections(
+        record: JSONObject,
+        registryBacked: Boolean,
+        risk: Boolean,
+        hasVisual: Boolean,
+        id: String,
+        capturedAt: Long,
+        operator: String,
+        siteId: String,
+        lat: Double,
+        lon: Double,
+        accuracy: Double,
+        device: String,
+        maskedDevice: String,
+        forensic: EvidenceForensicValidator.Result
+    ) {
+        val sha = firstNonBlank(
+            record.optString("imageSha256"),
+            record.optString("sha256"),
+            record.optString("thumbnailSha256"),
+            record.optString("imageHash")
+        )
+        val signature = firstNonBlank(
+            record.optString("captureSignature"),
+            record.optString("signature"),
+            record.optString("sig")
+        )
+        val locationIntegrity = if (risk) "⚠ REVIEW REQUIRED" else "✓ NO LOCATION RISK FLAG"
+        val registry = if (registryBacked) "✓ PUBLIC RECORD CONFIRMED" else "• PUBLIC REGISTRY NOT CONFIRMED"
+        val visual = if (hasVisual) "✓ EVIDENCE VISUAL AVAILABLE" else "⚠ EVIDENCE VISUAL UNAVAILABLE"
+        val signatureState = if (signature.isNotBlank()) "✓ CAPTURE SIGNATURE PRESENT" else "• SIGNATURE DATA NOT EXPOSED"
+        val hashState = if (sha.isNotBlank()) "✓ IMAGE HASH RECORDED" else "• IMAGE HASH NOT EXPOSED"
+
+        binding.tvCoreFacts.text = buildString {
+            append("Evidence ID\n$id\n\n")
+            append("Operator\n${operator.ifBlank { "Unavailable" }}\n\n")
+            append("Site\n${siteId.ifBlank { "Unassigned" }}\n\n")
+            append("Captured\n${formatTime(capturedAt)}\n\n")
+            append("Location\n")
+            if (lat.isFinite() && lon.isFinite()) {
+                append("%.6f, %.6f".format(Locale.US, lat, lon))
+                if (accuracy.isFinite()) append("\n±%.1f m".format(Locale.US, accuracy))
+            } else append("Unavailable")
+        }
+
+        binding.tvEvidenceTimeline.text = buildString {
+            append("✓  CAPTURED\n")
+            append("   ${formatTime(capturedAt)}\n\n")
+            append("✓  SEALED / RECORDED\n")
+            append("   Evidence record available for validation\n\n")
+            if (registryBacked) {
+                append("✓  REGISTERED\n")
+                append("   Public registry record confirmed\n\n")
+            } else {
+                append("•  REGISTRATION\n")
+                append("   Public registry confirmation unavailable\n\n")
+            }
+            if (risk) {
+                append("⚠  REVIEW\n")
+                append("   Location-integrity signal requires review")
+            } else {
+                append("✓  VERIFICATION\n")
+                append("   Current evidence checks completed")
+            }
+        }
+
+        binding.tvTechnicalDetails.text = buildString {
+            append("FORENSIC     ${forensic.state.name}\n")
+            append("ID CHECK     ${if (forensic.idConsistent) "PASS" else "FAIL"}\n")
+            append("HASH FORMAT  ${if (forensic.hashFormatValid) "PASS" else "FAIL"}\n")
+            append("REGISTRY     $registry\n")
+            append("VISUAL       $visual\n")
+            append("LOCATION     $locationIntegrity\n")
+            append("SIGNATURE    ${when (forensic.signatureVerified) { true -> "PASS · VERIFIED"; false -> "FAIL · INVALID"; null -> signatureState }}\n")
+            append("SIGNED DATA  ${if (forensic.signedPayloadConsistent) "PASS · MATCHED" else "REVIEW / MISMATCH"}\n")
+            append("THUMB HASH   ${when (forensic.thumbnailHashVerified) { true -> "PASS · MATCHED"; false -> "FAIL · MISMATCH"; null -> "NOT AVAILABLE" }}\n")
+            append("DEVICE       $device\n")
+            append("DEVICE ID    $maskedDevice")
+            if (sha.isNotBlank()) append("\nSHA-256      ${sha.take(16)}…")
+            if (signature.isNotBlank()) append("\nSIGNATURE     ${signature.take(16)}…")
+        }
     }
 
     private fun renderThumbnail(record: JSONObject) {
@@ -301,7 +402,6 @@ class VerifyEvidenceActivity : AppCompatActivity() {
             "operatorSessionPhotoTotal", "operatorSessionSitesVisited",
             "operatorSessionStartedAt", "operatorSessionClockOutAt",
             "operatorSessionClockOutReason", "siteDistanceM", "siteRadiusM",
-            "aiObjectCountSummary", "aiVisualSummary", "aiVisualSummaryStatus", "aiVisualSummaryProvider"
         )
         keys.forEach { key ->
             val remoteMissing = !merged.has(key) || merged.isNull(key) || merged.optString(key).isBlank()
@@ -323,10 +423,14 @@ class VerifyEvidenceActivity : AppCompatActivity() {
 
     private fun showNotRegistered(id: String) {
         currentRecord = null
-        binding.tvResultStatus.text = "NOT REGISTERED"
+        binding.tvResultStatus.text = "NOT FOUND"
         binding.tvResultStatus.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark))
-        binding.tvResultSummary.text = "No public evidence record was found for this Evidence ID."
-        binding.tvResultDetails.text = "EVIDENCE ID\n$id\n\nCheck the ID or scan the QR again."
+        binding.tvResultBadge.text = "NOT FOUND"
+        binding.tvResultSummary.text = "No public evidence record was found for this Evidence ID. Check the ID or scan the QR again."
+        binding.tvResultDetails.text = "EVIDENCE ID  •  $id\nSTATUS  •  No matching registry record\nNEXT STEP  •  Scan the original GeoStamp QR or recheck the Evidence ID."
+        binding.tvCoreFacts.text = "Evidence ID\n$id\n\nNo evidence facts are available until a matching record is found."
+        binding.tvEvidenceTimeline.text = "•  CAPTURE RECORD NOT FOUND\n   No matching public evidence record was returned.\n\n•  VERIFICATION STOPPED\n   Recheck the Evidence ID or scan the original QR."
+        binding.tvTechnicalDetails.text = "REGISTRY     ✕ NO MATCH\nVISUAL       • NOT AVAILABLE\nLOCATION     • NOT AVAILABLE\nSIGNATURE    • NOT AVAILABLE\nHASH         • NOT AVAILABLE"
         binding.ivEvidenceThumbnail.visibility = View.GONE
         binding.tvThumbnailUnavailable.visibility = View.VISIBLE
         binding.tvSessionActivity.visibility = View.GONE

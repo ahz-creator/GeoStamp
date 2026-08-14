@@ -63,6 +63,7 @@ data class GeoPhoto(
     val verificationId: String = "",
     val imageSha256: String = "",
     val evidenceStatus: String = "UNAVAILABLE",
+    val registryStatus: String = "",
     val sameDayPriorPhotos: Int = 0,
     val photosInLast90Days: Int = 0,
     val visitSessionsLast90Days: Int = 0,
@@ -94,7 +95,8 @@ private fun GeoPhoto.gpsLabel(): String = when {
     locationIntegrityRisk           -> "F  RISK"
     evidenceStatus == "FAIL"        -> "✗ FAILED"
     evidenceStatus == "WARNING"     -> "! WARNING"
-    gpsVerified && imageSha256.isNotBlank() && accuracy <= 15.0 -> "✓ REGISTERED"
+    registryStatus == "PUBLIC_RECORD" -> "✓ REGISTERED"
+    gpsVerified && imageSha256.isNotBlank() -> "✓ SEALED"
     gpsVerified                     -> "! PENDING"
     else                            -> "✗ GPS"
 }
@@ -301,7 +303,9 @@ class GalleryActivity : AppCompatActivity() {
             if (photo.workspaceMode == "personal") {
                 "PERSONAL|${photo.operator.ifBlank { "Personal" }}|${photo.siteId.ifBlank { "New Evidence" }}"
             } else {
-                "ORG|${photo.siteId.ifBlank { "UNASSIGNED" }}"
+                val normalizedSite = photo.siteId.trim().takeIf { it.isNotBlank() && it != "–" }
+                    ?: "UNASSIGNED"
+                "ORG|$normalizedSite"
             }
         }
         return groups.values.map { ph ->
@@ -315,13 +319,20 @@ class GalleryActivity : AppCompatActivity() {
                     photos = sorted
                 )
             } else {
-                SiteAlbum(first.siteId.ifBlank { "UNASSIGNED" }, first.operator, first.distanceM, sorted)
+                SiteAlbum(
+                    first.siteId.trim().takeIf { it.isNotBlank() && it != "–" } ?: "UNASSIGNED",
+                    first.operator,
+                    first.distanceM,
+                    sorted
+                )
             }
         }.sortedByDescending { it.lastVisitMs }
     }
 
     private fun updateStats(photos: List<GeoPhoto>) {
-        val uniqueSites = photos.map { it.siteId }.filter { it.isNotBlank() }.toSet().size
+        val uniqueSites = photos.map { it.siteId.trim() }
+            .filter { it.isNotBlank() && it != "–" && it != "UNASSIGNED" }
+            .toSet().size
         val now = System.currentTimeMillis()
         val todayCount = photos.count { now - it.dateMs < 86_400_000L }
         binding.tvPhotoPill.text    = "${photos.size} Photos"
@@ -728,6 +739,15 @@ class GalleryActivity : AppCompatActivity() {
                 val date = c.getLong(dtCol) * 1000L
                 val uri  = ContentUris.withAppendedId(collection, id)
                 val meta = loadMeta(metaDir, name)
+                val evidenceId = meta.optString("evidenceId", meta.optString("verificationId", ""))
+                val registryStatus = if (evidenceId.isBlank()) "" else {
+                    runCatching {
+                        com.axiominfratech.geostamp.verification.EvidenceRegistryOutbox
+                            .publishedRecord(this@GalleryActivity, evidenceId)
+                            ?.optString("registryStatus", "")
+                            .orEmpty()
+                    }.getOrDefault("")
+                }
                 photos += GeoPhoto(uri, name, date,
                     lat         = meta.optDouble("lat", 0.0),
                     lon         = meta.optDouble("lon", 0.0),
@@ -742,6 +762,7 @@ class GalleryActivity : AppCompatActivity() {
                     verificationId = meta.optString("verificationId", ""),
                     imageSha256 = meta.optString("imageSha256", ""),
                     evidenceStatus = meta.optString("evidenceStatus", "UNAVAILABLE"),
+                    registryStatus = registryStatus,
                     sameDayPriorPhotos = meta.optInt("sameDayPriorPhotos", 0),
                     photosInLast90Days = meta.optInt("photosInLast90Days", 0),
                     visitSessionsLast90Days = meta.optInt("visitSessionsLast90Days", 0),
@@ -817,8 +838,10 @@ class SiteAlbumAdapter(
         h.siteId.setTextColor(if (isUnassigned) 0xFFF59E0B.toInt() else 0xFFF1F5F9.toInt())
         // Amber border for unassigned via tag
         h.itemView.tag = if (isUnassigned) "unassigned" else null
-        h.operator.text = if (isUnassigned) "GPS Verification Failed" else album.operator.ifBlank { "–" }
-        h.operator.setTextColor(if (isUnassigned) 0xFFEF4444.toInt() else 0xFF22D3EE.toInt())
+        h.operator.text = if (isUnassigned)
+            "Location not matched · review required"
+        else album.operator.ifBlank { "–" }
+        h.operator.setTextColor(if (isUnassigned) 0xFFF59E0B.toInt() else 0xFF22D3EE.toInt())
         h.distance.text = if (album.distanceM > 0) {
             " · " + if (album.distanceM >= 1000) "%.1fkm away".format(album.distanceM / 1000)
                     else "%.0fm away".format(album.distanceM)

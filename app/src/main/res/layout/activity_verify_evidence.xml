@@ -1,315 +1,130 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="#07101F"
-    android:fillViewport="true">
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="#050912" android:fillViewport="true" android:overScrollMode="never">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:paddingStart="16dp" android:paddingEnd="16dp"
+        android:paddingTop="10dp" android:paddingBottom="36dp">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="12dp">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="46dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <ImageButton
-                android:id="@+id/btn_back"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Back"
-                android:src="@android:drawable/ic_media_previous"
-                app:tint="#EAF2FF" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="VERIFY EVIDENCE"
-                android:textColor="#FFFFFF"
-                android:textSize="17sp"
-                android:textStyle="bold" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="60dp" android:gravity="center_vertical">
+            <ImageButton android:id="@+id/btn_back" android:layout_width="44dp" android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless" android:contentDescription="Back"
+                android:padding="10dp" android:src="@drawable/ic_back" app:tint="#E8F2FF"/>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:layout_marginStart="8dp" android:orientation="vertical">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Evidence Verification"
+                    android:textColor="#F5FAFF" android:textSize="22sp" android:textStyle="bold"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp"
+                    android:text="GeoStamp  •  Axiom Infratech" android:textColor="#42D7EA" android:textSize="10sp" android:textStyle="bold"/>
+            </LinearLayout>
+            <TextView android:layout_width="wrap_content" android:layout_height="28dp" android:gravity="center"
+                android:paddingHorizontal="10dp" android:text="SECURE" android:textColor="#7DECF7" android:textSize="8sp" android:textStyle="bold"
+                android:background="@drawable/bg_chip_inactive_glass"/>
         </LinearLayout>
 
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            app:cardBackgroundColor="#0D1A2D"
-            app:cardCornerRadius="14dp"
-            app:strokeColor="#294B70"
-            app:strokeWidth="1dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="10dp">
-
-                <Button
-                    android:id="@+id/btn_scan_qr"
-                    android:layout_width="match_parent"
-                    android:layout_height="42dp"
-                    android:backgroundTint="#28C3E5"
-                    android:text="SCAN QR"
-                    android:textColor="#04101B"
-                    android:textStyle="bold" />
-
-                <EditText
-                    android:id="@+id/input_verification_id"
-                    android:layout_width="match_parent"
-                    android:layout_height="44dp"
-                    android:layout_marginTop="7dp"
-                    android:background="@drawable/bg_verify_input"
-                    android:hint="Enter Evidence ID"
-                    android:inputType="textCapCharacters"
-                    android:paddingHorizontal="12dp"
-                    android:singleLine="true"
-                    android:textColor="#FFFFFF"
-                    android:textColorHint="#7A8DA6"
-                    android:textSize="14sp" />
-
-                <Button
-                    android:id="@+id/btn_verify_id"
-                    android:layout_width="match_parent"
-                    android:layout_height="40dp"
-                    android:layout_marginTop="7dp"
-                    android:backgroundTint="#35557F"
-                    android:text="VERIFY"
-                    android:textColor="#FFFFFF"
-                    android:textStyle="bold" />
+        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content"
+            app:cardBackgroundColor="#0A1320" app:cardCornerRadius="22dp" app:strokeColor="#17344D" app:strokeWidth="1dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="VERIFY AN EVIDENCE RECORD"
+                    android:textColor="#7E9BB7" android:textSize="9sp" android:textStyle="bold" android:letterSpacing="0.08"/>
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp"
+                    android:text="Scan the QR printed on a GeoStamp photo, or enter its Evidence ID." android:textColor="#AFC1D3" android:textSize="11sp"/>
+                <Button android:id="@+id/btn_scan_qr" android:layout_width="match_parent" android:layout_height="50dp" android:layout_marginTop="14dp"
+                    android:backgroundTint="#35D9EA" android:text="SCAN QR TO VERIFY" android:textColor="#041219" android:textSize="12sp" android:textStyle="bold"/>
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:layout_marginTop="10dp">
+                    <View android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" android:background="#19324A"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginHorizontal="10dp" android:text="OR" android:textColor="#5D7690" android:textSize="8sp" android:textStyle="bold"/>
+                    <View android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" android:background="#19324A"/>
+                </LinearLayout>
+                <EditText android:id="@+id/input_verification_id" android:layout_width="match_parent" android:layout_height="48dp" android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_verify_input" android:hint="GST-E56D-AC67" android:inputType="textCapCharacters"
+                    android:paddingHorizontal="14dp" android:singleLine="true" android:textColor="#F7FBFF" android:textColorHint="#627A93" android:textSize="13sp"/>
+                <Button android:id="@+id/btn_verify_id" android:layout_width="match_parent" android:layout_height="44dp" android:layout_marginTop="8dp"
+                    android:backgroundTint="#12263B" android:text="VERIFY EVIDENCE ID" android:textColor="#DDEBFA" android:textSize="11sp" android:textStyle="bold"/>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <FrameLayout
-            android:id="@+id/scanner_container"
-            android:layout_width="match_parent"
-            android:layout_height="300dp"
-            android:layout_marginTop="8dp"
-            android:background="#000000"
-            android:visibility="gone">
-            <androidx.camera.view.PreviewView
-                android:id="@+id/scanner_preview"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent" />
-            <View
-                android:layout_width="220dp"
-                android:layout_height="220dp"
-                android:layout_gravity="center"
-                android:background="@drawable/bg_qr_frame" />
+        <FrameLayout android:id="@+id/scanner_container" android:layout_width="match_parent" android:layout_height="340dp" android:layout_marginTop="12dp"
+            android:background="#000000" android:visibility="gone">
+            <androidx.camera.view.PreviewView android:id="@+id/scanner_preview" android:layout_width="match_parent" android:layout_height="match_parent"/>
+            <View android:layout_width="240dp" android:layout_height="240dp" android:layout_gravity="center" android:background="@drawable/bg_qr_frame"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="bottom|center_horizontal" android:layout_marginBottom="18dp"
+                android:background="#D90A1423" android:paddingHorizontal="16dp" android:paddingVertical="9dp" android:text="SCAN GEOSTAMP QR  •  KEEP CODE INSIDE FRAME"
+                android:textColor="#FFFFFF" android:textSize="9sp" android:textStyle="bold"/>
         </FrameLayout>
 
-        <ProgressBar
-            android:id="@+id/progress"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
-            android:layout_gravity="center"
-            android:layout_marginTop="8dp"
-            android:visibility="gone" />
+        <ProgressBar android:id="@+id/progress" android:layout_width="34dp" android:layout_height="34dp" android:layout_gravity="center"
+            android:layout_marginTop="18dp" android:indeterminateTint="#35D9EA" android:visibility="gone"/>
 
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/result_card"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:visibility="gone"
-            app:cardBackgroundColor="#FFFFFF"
-            app:cardCornerRadius="10dp"
-            app:strokeColor="#CCD4DE"
-            app:strokeWidth="1dp">
+        <com.google.android.material.card.MaterialCardView android:id="@+id/result_card" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="16dp" android:visibility="gone" app:cardBackgroundColor="#08111D" app:cardCornerRadius="24dp" app:strokeColor="#1A3A54" app:strokeWidth="1dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="14dp">
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="14dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="bottom"
-                    android:orientation="horizontal">
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="GEOSTAMP"
-                            android:textColor="#111827"
-                            android:textSize="22sp"
-                            android:textStyle="bold" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Axiom Infratech"
-                            android:textColor="#2F855A"
-                            android:textSize="10sp"
-                            android:textStyle="bold" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:background="#0B1927" android:gravity="center_vertical" android:padding="14dp">
+                    <com.google.android.material.card.MaterialCardView android:layout_width="56dp" android:layout_height="56dp" app:cardBackgroundColor="#103528" app:cardCornerRadius="28dp" app:strokeColor="#35D98A" app:strokeWidth="1dp">
+                        <TextView android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:text="✓" android:textColor="#67E8A4" android:textSize="27sp" android:textStyle="bold"/>
+                    </com.google.android.material.card.MaterialCardView>
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="12dp" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="OVERALL RESULT" android:textColor="#7794AE" android:textSize="8sp" android:textStyle="bold" android:letterSpacing="0.12"/>
+                        <TextView android:id="@+id/tv_result_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="✓ VERIFIED" android:textColor="#65E6A0" android:textSize="24sp" android:textStyle="bold"/>
                     </LinearLayout>
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="end"
-                        android:text="EVIDENCE\nRECEIPT"
-                        android:textColor="#4B5563"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
+                    <TextView android:id="@+id/tv_result_badge" android:layout_width="wrap_content" android:layout_height="wrap_content" android:background="#12382A" android:paddingHorizontal="10dp" android:paddingVertical="7dp" android:text="VERIFIED" android:textColor="#7AE9A9" android:textSize="8sp" android:textStyle="bold"/>
                 </LinearLayout>
 
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginTop="8dp"
-                    android:background="#D1D5DB" />
+                <TextView android:id="@+id/tv_result_summary" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:textColor="#B3C4D7" android:textSize="11sp" android:lineSpacingExtra="2dp"/>
 
-                <FrameLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="170dp"
-                    android:layout_marginTop="10dp"
-                    android:background="#EEF2F5">
-                    <ImageView
-                        android:id="@+id/iv_evidence_thumbnail"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:contentDescription="Evidence thumbnail"
-                        android:scaleType="centerCrop"
-                        android:visibility="gone" />
-                    <TextView
-                        android:id="@+id/tv_thumbnail_unavailable"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:gravity="center"
-                        android:padding="20dp"
-                        android:text="PHOTO NOT AVAILABLE ON THIS DEVICE"
-                        android:textColor="#6B7280"
-                        android:textSize="11sp"
-                        android:textStyle="bold" />
-                </FrameLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-                    <TextView
-                        android:id="@+id/tv_result_status"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="VERIFIED · REGISTERED"
-                        android:textColor="#159447"
-                        android:textSize="17sp"
-                        android:textStyle="bold" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="#EAF7EE"
-                        android:paddingHorizontal="9dp"
-                        android:paddingVertical="5dp"
-                        android:text="PUBLIC RECORD"
-                        android:textColor="#19733B"
-                        android:textSize="9sp"
-                        android:textStyle="bold" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:orientation="horizontal">
+                    <com.google.android.material.card.MaterialCardView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" app:cardBackgroundColor="#0D1D2D" app:cardCornerRadius="14dp" app:strokeColor="#183750" app:strokeWidth="1dp">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="11dp">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="EVIDENCE ID" android:textColor="#66819A" android:textSize="8sp" android:textStyle="bold"/>
+                            <TextView android:id="@+id/tv_evidence_id" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:ellipsize="end" android:maxLines="1" android:textColor="#F3F8FF" android:textSize="12sp" android:textStyle="bold"/>
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+                    <Space android:layout_width="8dp" android:layout_height="1dp"/>
+                    <com.google.android.material.card.MaterialCardView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" app:cardBackgroundColor="#0D1D2D" app:cardCornerRadius="14dp" app:strokeColor="#183750" app:strokeWidth="1dp">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="11dp">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SITE" android:textColor="#66819A" android:textSize="8sp" android:textStyle="bold"/>
+                            <TextView android:id="@+id/tv_site_id" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:ellipsize="end" android:maxLines="1" android:textColor="#C88CFF" android:textSize="12sp" android:textStyle="bold"/>
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
                 </LinearLayout>
 
-                <TextView
-                    android:id="@+id/tv_result_summary"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:textColor="#6B7280"
-                    android:textSize="10sp" />
+                <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="250dp" android:layout_marginTop="12dp" app:cardBackgroundColor="#060C14" app:cardCornerRadius="18dp" app:strokeColor="#183750" app:strokeWidth="1dp">
+                    <FrameLayout android:layout_width="match_parent" android:layout_height="match_parent">
+                        <ImageView android:id="@+id/iv_evidence_thumbnail" android:layout_width="match_parent" android:layout_height="match_parent" android:contentDescription="Evidence thumbnail" android:scaleType="centerCrop" android:visibility="gone"/>
+                        <LinearLayout android:id="@+id/tv_thumbnail_unavailable" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="EVIDENCE IMAGE UNAVAILABLE" android:textColor="#71869D" android:textSize="10sp" android:textStyle="bold"/>
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="The signed evidence record can still be validated." android:textColor="#536A80" android:textSize="9sp"/>
+                        </LinearLayout>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="top|start" android:layout_margin="10dp" android:background="#CC071321" android:paddingHorizontal="8dp" android:paddingVertical="5dp" android:text="CAPTURED EVIDENCE" android:textColor="#D3E2F1" android:textSize="8sp" android:textStyle="bold"/>
+                    </FrameLayout>
+                </com.google.android.material.card.MaterialCardView>
 
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="EVIDENCE"
-                    android:textColor="#5B8F20"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginTop="3dp"
-                    android:background="#D1D5DB" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="20dp" android:text="VERIFICATION CHECKS" android:textColor="#5DE1F0" android:textSize="10sp" android:textStyle="bold" android:letterSpacing="0.08"/>
+                <TextView android:id="@+id/tv_result_details" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:background="#0C1A29" android:lineSpacingExtra="5dp" android:padding="13dp" android:textColor="#DCE8F5" android:textSize="11sp"/>
 
-                <TextView
-                    android:id="@+id/tv_result_details"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:lineSpacingExtra="1dp"
-                    android:textColor="#1F2937"
-                    android:textSize="11.5sp" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp" android:text="EVIDENCE FACTS" android:textColor="#5DE1F0" android:textSize="10sp" android:textStyle="bold" android:letterSpacing="0.08"/>
+                <TextView android:id="@+id/tv_core_facts" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:background="#0C1826" android:lineSpacingExtra="4dp" android:padding="13dp" android:textColor="#C8D7E6" android:textSize="11sp"/>
 
-                <TextView
-                    android:id="@+id/tv_session_activity"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:background="#F7F8F4"
-                    android:lineSpacingExtra="1dp"
-                    android:padding="9dp"
-                    android:textColor="#253142"
-                    android:textSize="10.5sp"
-                    android:visibility="gone" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp" android:text="EVIDENCE LIFECYCLE" android:textColor="#5DE1F0" android:textSize="10sp" android:textStyle="bold" android:letterSpacing="0.08"/>
+                <TextView android:id="@+id/tv_evidence_timeline" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:background="#0C1826" android:lineSpacingExtra="5dp" android:padding="13dp" android:textColor="#C8D7E6" android:textSize="11sp"/>
+                <TextView android:id="@+id/tv_session_activity" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="9dp" android:background="#0E2031" android:lineSpacingExtra="3dp" android:padding="11dp" android:textColor="#9FB6CD" android:textSize="10sp" android:visibility="gone"/>
 
-                <Button
-                    android:id="@+id/btn_view_report"
-                    android:layout_width="match_parent"
-                    android:layout_height="43dp"
-                    android:layout_marginTop="11dp"
-                    android:backgroundTint="#7CB342"
-                    android:text="SHARE FULL PDF REPORT"
-                    android:textColor="#10210A"
-                    android:textStyle="bold" />
+                <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" app:cardBackgroundColor="#07111E" app:cardCornerRadius="14dp" app:strokeColor="#142C43" app:strokeWidth="1dp">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="12dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="TECHNICAL EVIDENCE" android:textColor="#718BA5" android:textSize="8sp" android:textStyle="bold" android:letterSpacing="0.1"/>
+                        <TextView android:id="@+id/tv_technical_details" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:lineSpacingExtra="4dp" android:textColor="#8298AF" android:textSize="9.5sp"/>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:gravity="center"
-                    android:text="Captured &amp; Sealed by GeoStamp · Axiom Infratech"
-                    android:textColor="#9CA3AF"
-                    android:textSize="8.5sp" />
+                <Button android:id="@+id/btn_view_report" android:layout_width="match_parent" android:layout_height="50dp" android:layout_marginTop="14dp" android:backgroundTint="#35D9EA" android:text="VIEW FORENSIC REPORT" android:textColor="#041219" android:textSize="11sp" android:textStyle="bold"/>
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:gravity="center" android:text="GeoStamp  •  Evidence verification by Axiom Infratech" android:textColor="#50667D" android:textSize="8.5sp"/>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/trust_card"
-            android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone">
-            <LinearLayout android:layout_width="1dp" android:layout_height="1dp">
-                <TextView android:id="@+id/tv_confidence_score" android:layout_width="1dp" android:layout_height="1dp" />
-                <TextView android:id="@+id/tv_confidence_level" android:layout_width="1dp" android:layout_height="1dp" />
-                <ProgressBar android:id="@+id/confidence_progress" android:layout_width="1dp" android:layout_height="1dp" />
-                <TextView android:id="@+id/tv_trust_conclusion" android:layout_width="1dp" android:layout_height="1dp" />
-                <TextView android:id="@+id/tv_trust_findings" android:layout_width="1dp" android:layout_height="1dp" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/timeline_card"
-            android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone">
-            <TextView android:id="@+id/tv_evidence_timeline" android:layout_width="1dp" android:layout_height="1dp" />
-        </com.google.android.material.card.MaterialCardView>
-
-        <TextView
-            android:id="@+id/tv_error"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:textColor="#FF8A80"
-            android:textSize="13sp"
-            android:visibility="gone" />
+        <com.google.android.material.card.MaterialCardView android:id="@+id/trust_card" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone"><LinearLayout android:layout_width="1dp" android:layout_height="1dp"><TextView android:id="@+id/tv_confidence_score" android:layout_width="1dp" android:layout_height="1dp"/><TextView android:id="@+id/tv_confidence_level" android:layout_width="1dp" android:layout_height="1dp"/><ProgressBar android:id="@+id/confidence_progress" android:layout_width="1dp" android:layout_height="1dp"/><TextView android:id="@+id/tv_trust_conclusion" android:layout_width="1dp" android:layout_height="1dp"/><TextView android:id="@+id/tv_trust_findings" android:layout_width="1dp" android:layout_height="1dp"/></LinearLayout></com.google.android.material.card.MaterialCardView>
+        <com.google.android.material.card.MaterialCardView android:id="@+id/timeline_card" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone"><TextView android:id="@+id/tv_evidence_timeline_legacy" android:layout_width="1dp" android:layout_height="1dp"/></com.google.android.material.card.MaterialCardView>
+        <TextView android:id="@+id/tv_error" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:background="#35131B" android:padding="12dp" android:textColor="#FFAAA4" android:textSize="11sp" android:visibility="gone"/>
     </LinearLayout>
 </ScrollView>

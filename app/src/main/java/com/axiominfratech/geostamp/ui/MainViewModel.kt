@@ -23,6 +23,8 @@ import com.axiominfratech.geostamp.location.LocationEngine
 import com.axiominfratech.geostamp.overlay.OverlayRenderer
 import com.axiominfratech.geostamp.overlay.StampConfig
 import com.axiominfratech.geostamp.overlay.LiveInfoMode
+import com.axiominfratech.geostamp.overlay.SavedStampLayout
+import com.axiominfratech.geostamp.overlay.StampTheme
 import com.axiominfratech.geostamp.security.AntiSpoofManager
 import com.axiominfratech.geostamp.verification.IntegrityStatus
 import com.axiominfratech.geostamp.verification.VerificationEngine
@@ -113,6 +115,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             overlayAlpha     = prefs.getFloat("overlay_alpha", 0.6f),
             overlayScale     = prefs.getFloat("overlay_scale", 1.0f),
             savedOverlayHeightFraction = prefs.getFloat("saved_overlay_height_fraction", 0.25f).coerceIn(0.20f, 0.30f),
+            savedStampLayout = runCatching { SavedStampLayout.valueOf(prefs.getString("saved_stamp_layout", "CARD") ?: "CARD") }.getOrDefault(SavedStampLayout.CARD),
+            stampTheme = runCatching { StampTheme.valueOf(prefs.getString("stamp_theme", "DARK") ?: "DARK") }.getOrDefault(StampTheme.DARK),
+            blockIfSpoofDetected = prefs.getBoolean("block_if_spoof_detected", false),
             liveInfoMode     = runCatching {
                 LiveInfoMode.valueOf(prefs.getString("live_info_mode", null) ?: "")
             }.getOrElse {
@@ -220,9 +225,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _remoteAppConfig.value.activeOperators
 
     fun startOperatorSession(operator: RemoteConfigManager.OperatorConfig): Result<OperatorSessionManager.Session> = runCatching {
+        val loc = _uiState.value.currentLocation
         val session = operatorSessions.start(
             operator,
-            _remoteAppConfig.value.policy.operatorInactivityTimeoutMinutes
+            _remoteAppConfig.value.policy.operatorInactivityTimeoutMinutes,
+            startedLatitude = loc?.latitude,
+            startedLongitude = loc?.longitude,
+            startedAccuracyM = loc?.accuracyM
         )
         prefs.edit().putString("workspace_mode", "organization").apply()
         _uiState.update { it.copy(operatorSession = session, siteMatch = null) }
@@ -361,10 +370,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }.getOrNull()
                 val locationRisk = location.mockLocationDetected || state.gpsStatus == GpsStatus.SPOOFED
                 val integrityWarning = !location.isVerified
+                // The permanent image is created before registry publication.
+                // Never claim "REGISTERED" on the photo at capture time; registration
+                // is a later server/registry state.
                 val evidenceStatus = when {
                     locationRisk -> "LOCATION RISK"
-                    integrityWarning -> "REGISTERED • WARNING"
-                    else -> "REGISTERED"
+                    integrityWarning -> "LOCATION REVIEW"
+                    else -> "CAPTURE SEALED"
                 }
                 val verificationPayload = VerificationEngine.qrPayload(
                     evidenceId = evidenceId,
@@ -403,6 +415,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     networkType      = _networkStatus.value,
                     overlayScale     = config.overlayScale,
                     savedOverlayHeightFraction = config.savedOverlayHeightFraction,
+                    savedStampLayout = config.savedStampLayout,
+                    stampTheme = config.stampTheme,
                     overlayX         = resolvedOverlay.x, overlayY = resolvedOverlay.y,
                     overlayW         = resolvedOverlay.width, overlayH = resolvedOverlay.height,
                     previewW         = resolvedOverlay.previewW, previewH = resolvedOverlay.previewH,
@@ -427,15 +441,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (!EvidenceVisualCache.save(app, evidenceId, slipThumbnailBase64, thumbnailSha256)) {
                     _captureEvent.emit(CaptureEvent.Error("Mandatory visual evidence could not be persisted. Evidence was not registered."))
                     return@launch
-                }
-                val aiVisual = withContext(Dispatchers.IO) {
-                    AiVisualSummaryClient.analyze(
-                        app,
-                        slipThumbnailBase64,
-                        operatorStr,
-                        siteIdStr,
-                        location.timestampMs
-                    )
                 }
                 val slipSession = EvidenceSlipMetadata.sessionSnapshot(operatorSession, siteIdStr)
 
@@ -488,8 +493,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 try {
-                    val siteId   = if (isPersonal) personalReference else (state.siteMatch?.site?.siteId ?: "")
-                    val operator = if (isPersonal) personalTitle else (site?.operator ?: "")
+                    // Persist the exact identity used by the stamped image. Previously the
+                    // metadata could fall back to SiteMatch's raw value while the overlay
+                    // used siteIdStr/operatorStr, producing gallery "UNASSIGNED" records
+                    // even when the photograph visibly contained a Site ID.
+                    val siteId   = if (isPersonal) personalReference else
+                        siteIdStr.takeIf { it.isNotBlank() && it != "–" }
+                            ?: state.siteMatch?.site?.siteId.orEmpty()
+                    val operator = if (isPersonal) personalTitle else
+                        operatorStr.takeIf { it.isNotBlank() && it != "–" }
+                            ?: site?.operator.orEmpty()
                     val distM    = if (isPersonal) 0.0 else (state.siteMatch?.distanceM ?: 0.0)
                     val meta = JSONObject().apply {
                         put("lat",         location.latitude)
@@ -499,16 +512,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         put("operator",    operator)
                         put("operatorSessionId", operatorSession?.id ?: "")
                         put("operatorSessionStartedAt", operatorSession?.startedAt ?: 0L)
+                        operatorSession?.startedLatitude?.let { put("operatorSessionStartedLatitude", it) }
+                        operatorSession?.startedLongitude?.let { put("operatorSessionStartedLongitude", it) }
+                        operatorSession?.startedAccuracyM?.let { put("operatorSessionStartedAccuracyM", it) }
                         put("operatorSessionOperatorId", operatorSession?.operatorId ?: "")
                         put("operatorSessionOperatorName", operatorSession?.operatorName ?: "")
                         put("thumbnailBase64", slipThumbnailBase64)
                         put("thumbnailMimeType", "image/jpeg")
                         put("thumbnailSha256", thumbnailSha256)
                         put("visualEvidenceRequired", true)
-                        put("aiVisualSummary", aiVisual.summary)
-                        put("aiObjectCountSummary", aiVisual.summary)
-                        put("aiVisualSummaryStatus", aiVisual.status)
-                        put("aiVisualSummaryProvider", aiVisual.provider)
                         val slipKeys = slipSession.keys()
                         while (slipKeys.hasNext()) {
                             val slipKey = slipKeys.next()
@@ -657,7 +669,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     @Deprecated("Identity now comes from the verified sign-in profile")
     fun updateUsername(name: String) { /* intentionally ignored until account sign-in is connected */ }
-    fun updateStampConfig(config: StampConfig) { _stampConfig.update { config } }
+    fun updateStampConfig(config: StampConfig) {
+        prefs.edit()
+            .putBoolean("block_if_spoof_detected", config.blockIfSpoofDetected)
+            .apply()
+        _stampConfig.update { config }
+    }
 
     fun updateOverlayAlpha(alpha: Float) {
         val c = alpha.coerceIn(0.2f, 0.9f)
@@ -675,6 +692,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val fraction = (percent / 100f).coerceIn(0.20f, 0.30f)
         prefs.edit().putFloat("saved_overlay_height_fraction", fraction).apply()
         _stampConfig.update { it.copy(savedOverlayHeightFraction = fraction) }
+    }
+
+    fun updateSavedStampLayout(layout: SavedStampLayout) {
+        prefs.edit().putString("saved_stamp_layout", layout.name).apply()
+        _stampConfig.update { it.copy(savedStampLayout = layout) }
+    }
+
+    fun updateStampTheme(theme: StampTheme) {
+        prefs.edit().putString("stamp_theme", theme.name).apply()
+        _stampConfig.update { it.copy(stampTheme = theme) }
     }
 
     fun updateLiveInfoMode(mode: LiveInfoMode) {

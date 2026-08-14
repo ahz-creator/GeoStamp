@@ -104,8 +104,12 @@ object RegistryPublisher {
                 if (connection.responseCode !in 200..299) return@withContext null
                 val text = connection.inputStream.bufferedReader().use { it.readText() }
                 val json = JSONObject(text)
-                if (!json.optBoolean("ok", true)) null
-                else json.optJSONObject("record") ?: json
+                if (!json.optBoolean("ok", true)) return@withContext null
+                val record = json.optJSONObject("record") ?: json
+                val returnedId = record.optString("evidenceId", record.optString("verificationId", record.optString("id")))
+                    .trim()
+                if (returnedId.isBlank() || !returnedId.equals(evidenceId.trim(), ignoreCase = true)) return@withContext null
+                record
             }.getOrNull()
         }
 

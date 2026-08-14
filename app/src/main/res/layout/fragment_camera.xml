@@ -147,13 +147,13 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp"
+        android:padding="13dp"
         android:background="@drawable/bg_green_info_card"
         android:elevation="10dp"
         app:layout_constraintBottom_toTopOf="@id/bottom_panel"
         app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginStart="12dp"
-        android:layout_marginBottom="12dp">
+        android:layout_marginStart="10dp"
+        android:layout_marginBottom="10dp">
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -167,7 +167,7 @@
             <TextView android:id="@+id/tv_city_name_overlay"
                 android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:text="Location Acquired" android:textColor="#FFFFFF"
-                android:textSize="13sp" android:textStyle="bold"/>
+                android:textSize="12sp" android:textStyle="bold"/>
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:text="  ⋮" android:textColor="#88FFFFFF" android:textSize="16sp"/>
         </LinearLayout>
@@ -178,7 +178,7 @@
         <TextView android:id="@+id/tv_coords"
             android:layout_width="wrap_content" android:layout_height="wrap_content"
             android:text="–.–––° N,  –.–––° E"
-            android:textColor="#FFFFFF" android:textSize="14sp" android:textStyle="bold"
+            android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold"
             android:fontFamily="monospace" android:layout_marginBottom="4dp"/>
 
         <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
@@ -514,8 +514,8 @@
             android:layout_width="match_parent" android:layout_height="wrap_content"
             android:orientation="horizontal" android:gravity="center_vertical"
             android:paddingStart="12dp" android:paddingEnd="12dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp">
+            android:paddingTop="7dp"
+            android:paddingBottom="7dp">
 
             <!-- LEFT: Gallery + Settings -->
             <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
@@ -554,16 +554,16 @@
             <FrameLayout android:layout_width="0dp" android:layout_height="wrap_content"
                 android:layout_weight="1" android:gravity="center">
                 <ProgressBar android:id="@+id/capture_progress"
-                    android:layout_width="78dp" android:layout_height="78dp"
+                    android:layout_width="82dp" android:layout_height="82dp"
                     android:layout_gravity="center"
                     android:indeterminateTint="@color/brand_blue"
                     android:visibility="gone"/>
                 <ImageButton android:id="@+id/btn_capture"
-                    android:layout_width="78dp" android:layout_height="78dp"
+                    android:layout_width="82dp" android:layout_height="82dp"
                     android:src="@drawable/ic_shutter"
                     android:background="@drawable/bg_shutter_outer"
                     android:layout_gravity="center"
-                    android:padding="18dp"
+                    android:padding="19dp"
                     android:contentDescription="Capture"/>
             </FrameLayout>
 

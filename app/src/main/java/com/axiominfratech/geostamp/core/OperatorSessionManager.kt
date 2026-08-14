@@ -26,6 +26,9 @@ class OperatorSessionManager(context: Context) {
         val operatorCode: String,
         val aliases: List<String>,
         val startedAt: Long,
+        val startedLatitude: Double?,
+        val startedLongitude: Double?,
+        val startedAccuracyM: Float?,
         val lastActivityAt: Long,
         val inactivityTimeoutMinutes: Int,
         val photoCount: Int,
@@ -52,6 +55,9 @@ class OperatorSessionManager(context: Context) {
             operatorCode = prefs.getString(KEY_OPERATOR_CODE, "OP") ?: "OP",
             aliases = aliases,
             startedAt = startedAt,
+            startedLatitude = prefs.getString(KEY_STARTED_LAT, null)?.toDoubleOrNull(),
+            startedLongitude = prefs.getString(KEY_STARTED_LON, null)?.toDoubleOrNull(),
+            startedAccuracyM = prefs.getString(KEY_STARTED_ACC, null)?.toFloatOrNull(),
             lastActivityAt = prefs.getLong(KEY_LAST_ACTIVITY, startedAt),
             inactivityTimeoutMinutes = prefs.getInt(KEY_TIMEOUT_MINUTES, DEFAULT_INACTIVITY_MINUTES)
                 .coerceIn(1, 24 * 60),
@@ -71,7 +77,10 @@ class OperatorSessionManager(context: Context) {
 
     fun start(
         operator: RemoteConfigManager.OperatorConfig,
-        inactivityTimeoutMinutes: Int = DEFAULT_INACTIVITY_MINUTES
+        inactivityTimeoutMinutes: Int = DEFAULT_INACTIVITY_MINUTES,
+        startedLatitude: Double? = null,
+        startedLongitude: Double? = null,
+        startedAccuracyM: Float? = null
     ): Session {
         active()?.let { current ->
             if (current.operatorId == operator.id) return current
@@ -86,6 +95,11 @@ class OperatorSessionManager(context: Context) {
             .putString(KEY_OPERATOR_CODE, operator.code)
             .putString(KEY_ALIASES, JSONArray(operator.aliases).toString())
             .putLong(KEY_STARTED, now)
+            .apply {
+                if (startedLatitude != null) putString(KEY_STARTED_LAT, startedLatitude.toString()) else remove(KEY_STARTED_LAT)
+                if (startedLongitude != null) putString(KEY_STARTED_LON, startedLongitude.toString()) else remove(KEY_STARTED_LON)
+                if (startedAccuracyM != null) putString(KEY_STARTED_ACC, startedAccuracyM.toString()) else remove(KEY_STARTED_ACC)
+            }
             .putLong(KEY_LAST_ACTIVITY, now)
             .putInt(KEY_TIMEOUT_MINUTES, inactivityTimeoutMinutes.coerceIn(1, 24 * 60))
             .putInt(KEY_PHOTOS, 0)
@@ -122,6 +136,9 @@ class OperatorSessionManager(context: Context) {
             .remove(KEY_OPERATOR_CODE)
             .remove(KEY_ALIASES)
             .remove(KEY_STARTED)
+            .remove(KEY_STARTED_LAT)
+            .remove(KEY_STARTED_LON)
+            .remove(KEY_STARTED_ACC)
             .remove(KEY_LAST_ACTIVITY)
             .remove(KEY_TIMEOUT_MINUTES)
             .remove(KEY_PHOTOS)
@@ -210,6 +227,9 @@ class OperatorSessionManager(context: Context) {
             operatorCode = prefs.getString(KEY_OPERATOR_CODE, "OP") ?: "OP",
             aliases = jsonArrayToList(prefs.getString(KEY_ALIASES, "[]") ?: "[]"),
             startedAt = startedAt,
+            startedLatitude = prefs.getString(KEY_STARTED_LAT, null)?.toDoubleOrNull(),
+            startedLongitude = prefs.getString(KEY_STARTED_LON, null)?.toDoubleOrNull(),
+            startedAccuracyM = prefs.getString(KEY_STARTED_ACC, null)?.toFloatOrNull(),
             lastActivityAt = prefs.getLong(KEY_LAST_ACTIVITY, startedAt),
             inactivityTimeoutMinutes = prefs.getInt(KEY_TIMEOUT_MINUTES, DEFAULT_INACTIVITY_MINUTES),
             photoCount = prefs.getInt(KEY_PHOTOS, 0),
@@ -251,6 +271,9 @@ class OperatorSessionManager(context: Context) {
         private const val KEY_OPERATOR_CODE = "operator_session_operator_code"
         private const val KEY_ALIASES = "operator_session_aliases"
         private const val KEY_STARTED = "operator_session_started_at"
+        private const val KEY_STARTED_LAT = "operator_session_started_latitude"
+        private const val KEY_STARTED_LON = "operator_session_started_longitude"
+        private const val KEY_STARTED_ACC = "operator_session_started_accuracy_m"
         private const val KEY_LAST_ACTIVITY = "operator_session_last_activity_at"
         private const val KEY_TIMEOUT_MINUTES = "operator_session_inactivity_timeout_minutes"
         private const val KEY_PHOTOS = "operator_session_photo_count"

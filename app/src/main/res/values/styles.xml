@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="GeoStampAccordionHeader">
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:minHeight">68dp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">12dp</item>
+        <item name="android:background">@color/surface_card</item>
+        <item name="android:layout_marginTop">8dp</item>
+    </style>
+
+    <style name="GeoStampHeaderTextGroup">
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <style name="GeoStampAccordionTitle">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.05</item>
+    </style>
+
+    <style name="GeoStampAccordionSummary">
+        <item name="android:textColor">@color/text_secondary</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:layout_marginTop">2dp</item>
+    </style>
+
+    <style name="GeoStampChevron">
+        <item name="android:textColor">@color/text_secondary</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:paddingStart">12dp</item>
+    </style>
+
+    <style name="GeoStampAccordionContent">
+        <item name="android:orientation">vertical</item>
+        <item name="android:padding">16dp</item>
+        <item name="android:background">@color/surface_panel</item>
+    </style>
+
+    <style name="GeoStampLabel">
+        <item name="android:textColor">@color/text_secondary</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.03</item>
+    </style>
+
+    <style name="GeoStampValue">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:layout_marginTop">2dp</item>
+    </style>
+
+    <style name="GeoStampDivider">
+        <item name="android:background">@color/border_subtle</item>
+        <item name="android:layout_marginTop">12dp</item>
+        <item name="android:layout_marginBottom">12dp</item>
+    </style>
+
+    <style name="GeoStampHelper">
+        <item name="android:textColor">@color/text_secondary</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:lineSpacingExtra">2sp</item>
+    </style>
+
+    <style name="GeoStampRow">
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+    </style>
+
+    <style name="GeoStampPolicyRow" parent="GeoStampRow">
+        <item name="android:gravity">top</item>
+    </style>
+
+    <style name="GeoStampSliderLabels" parent="GeoStampRow">
+        <item name="android:layout_marginTop">4dp</item>
+    </style>
+
+    <style name="GeoStampSegmentGroup">
+        <item name="android:orientation">horizontal</item>
+        <item name="android:layout_marginTop">8dp</item>
+    </style>
+
+    <style name="GeoStampSegment" parent="Widget.MaterialComponents.CompoundButton.RadioButton">
+        <item name="android:button">@null</item>
+        <item name="android:background">@drawable/btn_segment_selector</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <style name="GeoStampRadio" parent="Widget.MaterialComponents.CompoundButton.RadioButton">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="GeoStampSectionMini">
+        <item name="android:textColor">@color/brand_blue</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:layout_marginBottom">8dp</item>
+    </style>
+
+</resources>

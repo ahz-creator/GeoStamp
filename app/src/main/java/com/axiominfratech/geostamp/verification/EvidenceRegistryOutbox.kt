@@ -5,6 +5,8 @@ import android.util.Base64
 import org.json.JSONObject
 import java.io.File
 import java.net.URLEncoder
+import java.util.Locale
+import com.axiominfratech.geostamp.forensics.EvidenceAuditTrail
 
 /** Public-safe local registry queue. */
 object EvidenceRegistryOutbox {
@@ -84,13 +86,41 @@ object EvidenceRegistryOutbox {
             copyIfPresent(fullMetadata, this, "siteRadiusM")
 
             put("createdAt", System.currentTimeMillis())
+            put("syncAttemptCount", 0)
+            put("nextRetryAt", 0L)
         }
 
         val dir = queueDir(context)
         val safeName = safeFileName(evidenceId)
-        return File(dir, "$safeName.json").also {
-            it.writeText(publicRecord.toString(2))
+        require(safeName.isNotBlank()) { "Evidence ID cannot be converted to a safe filename" }
+        val target = File(dir, "$safeName.json")
+        if (target.exists()) {
+            val existing = runCatching { JSONObject(target.readText()) }.getOrNull()
+            val existingHash = existing?.optString("imageSha256").orEmpty()
+            val newHash = publicRecord.optString("imageSha256")
+            if (existingHash.isNotBlank() && newHash.isNotBlank() && existingHash.equals(newHash, true)) {
+                return target
+            }
+            throw IllegalStateException("Evidence ID already exists in the local registry queue: $evidenceId")
         }
+
+        // Atomic write: never leave a half-written registry record if the app is
+        // killed or the device loses power during capture/finalization.
+        val temp = File(dir, ".${safeName}.${System.nanoTime()}.tmp")
+        temp.writeText(publicRecord.toString(2), Charsets.UTF_8)
+        if (!temp.renameTo(target)) {
+            temp.delete()
+            throw IllegalStateException("Unable to commit evidence record to the local registry queue")
+        }
+        runCatching {
+            EvidenceAuditTrail.append(context, EvidenceAuditTrail.Event(
+                evidenceId = evidenceId,
+                type = EvidenceAuditTrail.EventType.STORED,
+                timestamp = System.currentTimeMillis(),
+                details = JSONObject().put("queueFile", target.name)
+            ))
+        }
+        return target
     }
 
     private fun copyIfPresent(source: JSONObject, target: JSONObject, key: String) {
@@ -131,6 +161,16 @@ object EvidenceRegistryOutbox {
         return result
     }
 
+    fun recordRetry(file: File, attempt: Int, nextRetryAt: Long) {
+        if (!file.exists()) return
+        val json = runCatching { JSONObject(file.readText()) }.getOrNull() ?: return
+        json.put("syncAttemptCount", attempt.coerceAtLeast(0))
+        json.put("nextRetryAt", nextRetryAt.coerceAtLeast(0L))
+        val temp = File(file.parentFile, ".${file.name}.${System.nanoTime()}.tmp")
+        temp.writeText(json.toString(2), Charsets.UTF_8)
+        if (!temp.renameTo(file)) temp.delete()
+    }
+
     fun publishFileSilently(context: Context, file: File, registryUrl: String? = null): Boolean {
         if (!file.exists()) return false
         val publishedDir = File(context.filesDir, "evidence_registry_published").also { it.mkdirs() }
@@ -139,9 +179,20 @@ object EvidenceRegistryOutbox {
         if (json != null) {
             json.put("registryStatus", "PUBLIC_RECORD")
             json.put("publishedAt", System.currentTimeMillis())
+            json.put("syncAttemptCount", json.optInt("syncAttemptCount", 0))
+            json.put("nextRetryAt", 0L)
             if (!registryUrl.isNullOrBlank()) json.put("registryUrl", registryUrl)
             target.writeText(json.toString(2))
             file.delete()
+            runCatching {
+                EvidenceAuditTrail.append(context, EvidenceAuditTrail.Event(
+                    evidenceId = json.optString("evidenceId"),
+                    type = EvidenceAuditTrail.EventType.REGISTERED,
+                    timestamp = System.currentTimeMillis(),
+                    reference = registryUrl.orEmpty(),
+                    details = JSONObject().put("registryStatus", "PUBLIC_RECORD")
+                ))
+            }
             return true
         }
         return false
@@ -170,5 +221,8 @@ object EvidenceRegistryOutbox {
         File(context.filesDir, "evidence_registry_outbox").also { it.mkdirs() }
 
     private fun safeFileName(value: String): String =
-        value.lowercase().replace(Regex("[^a-z0-9._-]"), "-").trim('-')
+        value.trim().lowercase(Locale.ENGLISH)
+            .replace(Regex("[^a-z0-9._-]"), "-")
+            .replace(Regex("-+"), "-")
+            .trim('-')
 }

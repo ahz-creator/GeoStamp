@@ -1,251 +1,239 @@
 package com.axiominfratech.geostamp.ui
 
+import android.animation.LayoutTransition
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
-import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
-import android.widget.Toast
+import android.widget.TextView
+import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import com.axiominfratech.geostamp.R
-import com.axiominfratech.geostamp.database.Operator
 import com.axiominfratech.geostamp.databinding.FragmentStampOptionsBinding
-import com.axiominfratech.geostamp.overlay.OverlayColorScheme
 import com.axiominfratech.geostamp.overlay.LiveInfoMode
+import com.axiominfratech.geostamp.overlay.SavedStampLayout
+import com.axiominfratech.geostamp.overlay.StampTheme
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
-class StampOptionsFragment : Fragment() {
-
+class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
     private var _binding: FragmentStampOptionsBinding? = null
     private val binding get() = _binding!!
     private val viewModel: MainViewModel by activityViewModels()
 
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
-    ): View {
-        _binding = FragmentStampOptionsBinding.inflate(inflater, container, false)
-        return binding.root
-    }
+    private enum class Section { SITE, SAVED, INFO, CAMERA, PROTECTION }
+    private var openSection = Section.SAVED
+    private var applyingState = false
+
+    private data class Tokens(
+        val page: Int, val card: Int, val border: Int, val primary: Int,
+        val secondary: Int, val accent: Int, val preview: Int
+    )
+
+    private fun tokens(theme: StampTheme) = if (theme == StampTheme.LIGHT) Tokens(
+        Color.parseColor("#F5F8FC"), Color.WHITE, Color.parseColor("#D8E2EE"),
+        Color.parseColor("#0B1830"), Color.parseColor("#64748B"), Color.parseColor("#0AAFE6"), Color.WHITE
+    ) else Tokens(
+        Color.parseColor("#07101F"), Color.parseColor("#111D2D"), Color.parseColor("#233651"),
+        Color.parseColor("#F5F7FA"), Color.parseColor("#A9B6C8"), Color.parseColor("#25C7DF"), Color.BLACK
+    )
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        _binding = FragmentStampOptionsBinding.bind(view)
 
         binding.btnBack.setOnClickListener { parentFragmentManager.popBackStack() }
+        listOf(
+            binding.sectionSiteHeader to Section.SITE,
+            binding.sectionSavedHeader to Section.SAVED,
+            binding.sectionInfoHeader to Section.INFO,
+            binding.sectionCameraHeader to Section.CAMERA,
+            binding.sectionProtectionHeader to Section.PROTECTION
+        ).forEach { (header, section) -> header.setOnClickListener { setOpenSection(section, true) } }
+        binding.sectionSavedContent.post { setOpenSection(Section.SAVED, false) }
 
-        setupOperatorSpinner(emptyList())
-
-        // Site radius is controlled remotely by the administrator.
-        binding.sliderRadius.isEnabled = false
-        binding.sliderRadius.alpha = 0.45f
-
-        // ── Overlay alpha slider ───────────────────────────────────────
-        binding.sliderOverlayAlpha.addOnChangeListener { _, value, _ ->
-            val alpha = value / 100f
-            viewModel.updateOverlayAlpha(alpha)
-            binding.tvAlphaValue.text = "${value.toInt()}%"
-            refreshPreviewCard()
+        binding.groupLayout.setOnCheckedChangeListener { _, id -> if (!applyingState) when (id) {
+            R.id.radio_layout_card -> viewModel.updateSavedStampLayout(SavedStampLayout.CARD)
+            R.id.radio_layout_strip -> viewModel.updateSavedStampLayout(SavedStampLayout.STRIP)
+            R.id.radio_layout_footer -> viewModel.updateSavedStampLayout(SavedStampLayout.FOOTER)
+        } }
+        binding.groupSize.setOnCheckedChangeListener { _, id -> if (!applyingState) when (id) {
+            R.id.radio_size_compact -> viewModel.updateSavedOverlayHeight(20f)
+            R.id.radio_size_standard -> viewModel.updateSavedOverlayHeight(25f)
+            R.id.radio_size_large -> viewModel.updateSavedOverlayHeight(30f)
+        } }
+        binding.sliderOverlayAlpha.addOnChangeListener { _, value, fromUser ->
+            if (fromUser && !applyingState) viewModel.updateOverlayAlpha(value / 100f)
         }
-
-        // ── Overlay scale slider ───────────────────────────────────────
-        binding.sliderOverlayScale.addOnChangeListener { _, value, _ ->
-            viewModel.updateSavedOverlayHeight(value)
-            binding.tvScaleValue.text = "${value.toInt()}%"
-        }
-
-        // ── Security toggle ────────────────────────────────────────────
+        binding.groupTheme.setOnCheckedChangeListener { _, id -> if (!applyingState) when (id) {
+            R.id.radio_theme_dark -> viewModel.updateStampTheme(StampTheme.DARK)
+            R.id.radio_theme_light -> viewModel.updateStampTheme(StampTheme.LIGHT)
+        } }
+        binding.groupLiveInfo.setOnCheckedChangeListener { _, id -> if (!applyingState) when (id) {
+            R.id.radio_live_floating -> viewModel.updateLiveInfoMode(LiveInfoMode.FLOATING)
+            R.id.radio_live_bottom -> viewModel.updateLiveInfoMode(LiveInfoMode.BOTTOM)
+            R.id.radio_live_off -> viewModel.updateLiveInfoMode(LiveInfoMode.OFF)
+        } }
         binding.switchBlockSpoof.setOnCheckedChangeListener { _, checked ->
-            viewModel.updateStampConfig(viewModel.stampConfig.value.copy(blockIfSpoofDetected = checked))
+            if (!applyingState) viewModel.updateStampConfig(viewModel.stampConfig.value.copy(blockIfSpoofDetected = checked))
         }
-
-
-        // ══════════════════════════════════════════════════════════════
-        //  OVERLAY VISIBILITY SWITCHES
-        // ══════════════════════════════════════════════════════════════
-
-        binding.radioLiveFloating.setOnClickListener { viewModel.updateLiveInfoMode(LiveInfoMode.FLOATING) }
-        binding.radioLiveBottom.setOnClickListener { viewModel.updateLiveInfoMode(LiveInfoMode.BOTTOM) }
-        binding.radioLiveOff.setOnClickListener { viewModel.updateLiveInfoMode(LiveInfoMode.OFF) }
-
-        // ══════════════════════════════════════════════════════════════
-        //  COLOR SCHEME SWATCHES
-        // ══════════════════════════════════════════════════════════════
-
-        binding.containerSwatchBlack.setOnClickListener  { selectScheme(OverlayColorScheme.BLACK) }
-        binding.containerSwatchNavy.setOnClickListener   { selectScheme(OverlayColorScheme.NAVY) }
-        binding.containerSwatchForest.setOnClickListener { selectScheme(OverlayColorScheme.FOREST) }
-        binding.containerSwatchMaroon.setOnClickListener { selectScheme(OverlayColorScheme.MAROON) }
-
-        // The entire FrameLayout acts as the Custom swatch tap target
-        binding.btnCustomColor.setOnClickListener { selectScheme(OverlayColorScheme.CUSTOM) }
-
-        // ── Custom color hex input ─────────────────────────────────────
-        binding.btnApplyCustomColor.setOnClickListener {
-            val hex = binding.etCustomColorHex.text.toString().trim()
-            applyCustomHexColor(hex)
-        }
-        binding.etCustomColorHex.setOnEditorActionListener { tv, _, _ ->
-            applyCustomHexColor(tv.text.toString().trim())
-            tv.clearFocus(); false
-        }
-
-        // ══════════════════════════════════════════════════════════════
-        //  OBSERVE CONFIG — keep all UI in sync
-        // ══════════════════════════════════════════════════════════════
 
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.stampConfig.collect { config ->
-
-                // Radius
-                val adminRadius = viewModel.remoteAppConfig.value.policy.siteDetectionRadiusM.toFloat().coerceIn(0f, 1000f)
-                binding.sliderRadius.value = adminRadius
-                binding.tvRadiusValue.text = "Admin: ${adminRadius.toInt()} m"
-
-
-                // Security
-                binding.switchBlockSpoof.isChecked = config.blockIfSpoofDetected
-
-                // Alpha
-                val alphaPercent = (config.overlayAlpha * 100).toInt().toFloat().coerceIn(20f, 90f)
-                if (binding.sliderOverlayAlpha.value != alphaPercent)
-                    binding.sliderOverlayAlpha.value = alphaPercent
-                binding.tvAlphaValue.text = "${alphaPercent.toInt()}%"
-
-                // Saved-photo overlay height (20–30%)
-                val heightPercent = (config.savedOverlayHeightFraction * 100f).coerceIn(20f, 30f)
-                if (binding.sliderOverlayScale.value != heightPercent)
-                    binding.sliderOverlayScale.value = heightPercent
-                binding.tvScaleValue.text = "${heightPercent.toInt()}%"
-
-                // Exactly one live camera information mode
-                binding.radioLiveFloating.isChecked = config.liveInfoMode == LiveInfoMode.FLOATING
-                binding.radioLiveBottom.isChecked = config.liveInfoMode == LiveInfoMode.BOTTOM
-                binding.radioLiveOff.isChecked = config.liveInfoMode == LiveInfoMode.OFF
-
-                // Color scheme — update check marks + custom row
-                updateSchemeCheckmarks(config.colorScheme)
-                binding.rowCustomColor.visibility =
-                    if (config.colorScheme == OverlayColorScheme.CUSTOM) View.VISIBLE else View.GONE
-
-                // Update custom swatch preview if RGB is stored
-                if (config.colorScheme == OverlayColorScheme.CUSTOM && config.customColorRgb != 0) {
-                    applySwatchColor(binding.ivCustomColorPreview, config.customColorRgb)
+            viewModel.stampConfig.collect { applyState(it) }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.uiState.collect { state ->
+                val match = state.siteMatch
+                binding.tvSiteStatus.text = when {
+                    state.gpsStatus == MainViewModel.GpsStatus.SPOOFED -> "Location trust warning detected"
+                    match?.site != null -> "Matched: ${match.site.siteId} · ${match.distanceM.toInt()} m"
+                    else -> "Waiting for a verified site match"
                 }
-
-                // Live preview card
-                refreshPreviewCard()
             }
         }
     }
 
-    // ── Scheme selection ───────────────────────────────────────────────────────
-
-    private fun selectScheme(scheme: OverlayColorScheme) {
-        viewModel.updateColorScheme(scheme)
-        // If switching away from custom, hide row immediately
-        if (scheme != OverlayColorScheme.CUSTOM) {
-            binding.rowCustomColor.visibility = View.GONE
-        } else {
-            binding.rowCustomColor.visibility = View.VISIBLE
+    private fun setOpenSection(section: Section, animate: Boolean) {
+        openSection = section
+        val pairs = listOf(
+            Section.SITE to binding.sectionSiteContent,
+            Section.SAVED to binding.sectionSavedContent,
+            Section.INFO to binding.sectionInfoContent,
+            Section.CAMERA to binding.sectionCameraContent,
+            Section.PROTECTION to binding.sectionProtectionContent
+        )
+        if (animate) binding.sectionSavedContent.parent?.let { (it as? ViewGroup)?.layoutTransition = LayoutTransition().apply {
+            enableTransitionType(LayoutTransition.CHANGING)
+        } }
+        pairs.forEach { (key, content) ->
+            val show = key == section
+            if (show && content.visibility != View.VISIBLE) {
+                content.alpha = 0f
+                content.visibility = View.VISIBLE
+                content.animate().alpha(1f).setDuration(180).start()
+            } else if (!show) {
+                content.animate().alpha(0f).setDuration(120).withEndAction { content.visibility = View.GONE }.start()
+            }
         }
+        binding.tvSiteChevron.text = if (section == Section.SITE) "⌃" else "⌄"
+        binding.tvSavedChevron.text = if (section == Section.SAVED) "⌃" else "⌄"
+        binding.tvInfoChevron.text = if (section == Section.INFO) "⌃" else "⌄"
+        binding.tvCameraChevron.text = if (section == Section.CAMERA) "⌃" else "⌄"
+        binding.tvProtectionChevron.text = if (section == Section.PROTECTION) "⌃" else "⌄"
     }
 
-    private fun applyCustomHexColor(hex: String) {
-        // Accept with or without leading #
-        val clean = if (hex.startsWith("#")) hex else "#$hex"
+    private fun applyState(config: com.axiominfratech.geostamp.overlay.StampConfig) {
+        applyingState = true
         try {
-            val parsed = Color.parseColor(clean)
-            val rgb = parsed and 0x00FFFFFF  // strip alpha — we control it
-            viewModel.updateCustomColor(rgb)
-            applySwatchColor(binding.ivCustomColorPreview, rgb)
-            refreshPreviewCard()
-        } catch (_: Exception) {
-            Toast.makeText(requireContext(), "Invalid color — use #RRGGBB format", Toast.LENGTH_SHORT).show()
+            val t = tokens(config.stampTheme)
+            applyTokens(t)
+
+            val radius = viewModel.remoteAppConfig.value.policy.siteDetectionRadiusM
+            val radiusLabel = if (radius >= 1000) "${(radius / 1000).let { if (it % 1.0 == 0.0) it.toInt() else String.format("%.1f", it) }} km" else "${radius.toInt()} m"
+            binding.tvRadiusValue.text = radiusLabel
+            binding.tvSiteSummary.text = "Axiom Infratech · Site match $radiusLabel"
+            binding.tvOrganization.text = viewModel.remoteAppConfig.value.organization.name.ifBlank { "Axiom Infratech" }
+            binding.tvOrgLogic.text = "Automatic from verified site/session"
+
+            binding.radioLayoutCard.isChecked = config.savedStampLayout == SavedStampLayout.CARD
+            binding.radioLayoutStrip.isChecked = config.savedStampLayout == SavedStampLayout.STRIP
+            binding.radioLayoutFooter.isChecked = config.savedStampLayout == SavedStampLayout.FOOTER
+
+            val nearest = nearestHeight(config.savedOverlayHeightFraction)
+            binding.radioSizeCompact.isChecked = nearest == 20
+            binding.radioSizeStandard.isChecked = nearest == 25
+            binding.radioSizeLarge.isChecked = nearest == 30
+
+            val alphaPercent = (config.overlayAlpha * 100f).coerceIn(20f, 90f)
+            binding.sliderOverlayAlpha.value = alphaPercent
+            binding.tvAlphaValue.text = "${alphaPercent.toInt()}%"
+
+            binding.radioThemeDark.isChecked = config.stampTheme == StampTheme.DARK
+            binding.radioThemeLight.isChecked = config.stampTheme == StampTheme.LIGHT
+
+            binding.radioLiveFloating.isChecked = config.liveInfoMode == LiveInfoMode.FLOATING
+            binding.radioLiveBottom.isChecked = config.liveInfoMode == LiveInfoMode.BOTTOM
+            binding.radioLiveOff.isChecked = config.liveInfoMode == LiveInfoMode.OFF
+            binding.tvCameraSummary.text = when (config.liveInfoMode) {
+                LiveInfoMode.FLOATING -> "Floating Info Card"
+                LiveInfoMode.BOTTOM -> "Bottom Info Strip"
+                LiveInfoMode.OFF -> "Off"
+            }
+
+            binding.switchBlockSpoof.isChecked = config.blockIfSpoofDetected
+            binding.tvProtectionSummary.text = if (config.blockIfSpoofDetected) "Capture blocked on untrusted location" else "Location trust protection"
+            binding.tvProtectionManaged.text = "Available for this device/session"
+
+            binding.tvSavedSummary.text = "${layoutLabel(config.savedStampLayout)} · ${sizeLabel(nearest)} · ${alphaPercent.toInt()}% · ${if (config.stampTheme == StampTheme.DARK) "Dark" else "Light"}"
+            refreshPreview(config, t)
+        } finally { applyingState = false }
+    }
+
+    private fun nearestHeight(fraction: Float): Int = listOf(20,25,30).minByOrNull { abs(it/100f-fraction) } ?: 25
+    private fun sizeLabel(v: Int) = when(v) {20->"Compact";30->"Large";else->"Standard"}
+    private fun layoutLabel(v: SavedStampLayout) = when(v) { SavedStampLayout.CARD->"Card"; SavedStampLayout.STRIP->"Strip"; SavedStampLayout.FOOTER->"Footer" }
+
+    private fun refreshPreview(config: com.axiominfratech.geostamp.overlay.StampConfig, t: Tokens) {
+        binding.previewFrame.setBackgroundColor(t.preview)
+        val lp = binding.overlayPreviewCard.layoutParams
+        when (config.savedStampLayout) {
+            SavedStampLayout.CARD -> { lp.height = (150 * resources.displayMetrics.density).toInt().coerceAtLeast(1); binding.overlayPreviewCard.layoutParams = lp; binding.overlayPreviewCard.setPadding(12,12,12,12); binding.overlayPreviewCard.gravity = android.view.Gravity.NO_GRAVITY }
+            SavedStampLayout.STRIP -> { lp.height = (92 * resources.displayMetrics.density).toInt(); binding.overlayPreviewCard.layoutParams = lp; binding.overlayPreviewCard.setPadding(12,8,12,8); binding.overlayPreviewCard.gravity = android.view.Gravity.CENTER_VERTICAL }
+            SavedStampLayout.FOOTER -> { lp.height = (58 * resources.displayMetrics.density).toInt(); binding.overlayPreviewCard.layoutParams = lp; binding.overlayPreviewCard.setPadding(12,6,12,6); binding.overlayPreviewCard.gravity = android.view.Gravity.CENTER_VERTICAL }
         }
-    }
-
-    private fun applySwatchColor(view: View, rgb: Int) {
-        view.background = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = 8f * resources.displayMetrics.density
-            setColor(rgb or 0xFF000000.toInt())   // solid for the preview dot
-            setStroke((1.5f * resources.displayMetrics.density).toInt(),
-                Color.argb(100, 255, 255, 255))
+        val bg = GradientDrawable().apply {
+            cornerRadius = 16f * resources.displayMetrics.density
+            val a = (config.overlayAlpha * 255).toInt().coerceIn(50,230)
+            setColor(Color.argb(a, Color.red(t.card), Color.green(t.card), Color.blue(t.card)))
+            setStroke((1f * resources.displayMetrics.density).toInt(), t.border)
         }
+        binding.overlayPreviewCard.background = bg
+        val text = if (config.stampTheme == StampTheme.LIGHT) Color.parseColor("#0B1830") else Color.WHITE
+        val secondary = if (config.stampTheme == StampTheme.LIGHT) Color.parseColor("#64748B") else Color.parseColor("#A9B6C8")
+        binding.previewStatus.setTextColor(Color.rgb(34,197,94))
+        binding.previewCoords.setTextColor(text)
+        binding.previewTime.setTextColor(secondary)
+        binding.previewSite.setTextColor(secondary)
+        binding.previewStatus.text = "✓ Location verified"
+        binding.previewCoords.text = "24.8610° N, 67.0101° E"
+        binding.previewTime.text = "02 May 2026, 14:30"
+        binding.previewSite.text = "Site ID: PKZ-KHI-001"
     }
 
-    // ── Check mark management ──────────────────────────────────────────────────
-
-    private fun updateSchemeCheckmarks(active: OverlayColorScheme) {
-        binding.ivCheckBlack.visibility  = if (active == OverlayColorScheme.BLACK)   View.VISIBLE else View.GONE
-        binding.ivCheckNavy.visibility   = if (active == OverlayColorScheme.NAVY)    View.VISIBLE else View.GONE
-        binding.ivCheckForest.visibility = if (active == OverlayColorScheme.FOREST)  View.VISIBLE else View.GONE
-        binding.ivCheckMaroon.visibility = if (active == OverlayColorScheme.MAROON)  View.VISIBLE else View.GONE
-        binding.ivCheckCustom.visibility = if (active == OverlayColorScheme.CUSTOM)  View.VISIBLE else View.GONE
+    private fun applyTokens(t: Tokens) {
+        binding.stampSettingsRoot.setBackgroundColor(t.page)
+        binding.tvTitle.setTextColor(t.primary)
+        binding.tvSubtitle.setTextColor(t.accent)
+        binding.tvAutoSave.setTextColor(t.secondary)
+        val headers = listOf(binding.sectionSiteHeader,binding.sectionSavedHeader,binding.sectionInfoHeader,binding.sectionCameraHeader,binding.sectionProtectionHeader)
+        val contents = listOf(binding.sectionSiteContent,binding.sectionSavedContent,binding.sectionInfoContent,binding.sectionCameraContent,binding.sectionProtectionContent)
+        headers.forEach { applyCard(it,t.card,t.border); styleTree(it,t) }
+        contents.forEach { applyCard(it,t.card,t.border); styleTree(it,t) }
+        binding.previewFrame.setBackgroundColor(t.preview)
+        ViewCompat.getWindowInsetsController(requireView())?.isAppearanceLightStatusBars = t == tokens(StampTheme.LIGHT)
+        requireActivity().window.statusBarColor = t.page
+        requireActivity().window.navigationBarColor = t.page
     }
 
-    // ── Live preview card ──────────────────────────────────────────────────────
-
-    private fun refreshPreviewCard() {
-        val config  = viewModel.stampConfig.value
-        val alpha   = config.overlayAlpha.coerceIn(0.2f, 0.9f)
-        val alphaInt = (alpha * 255).toInt()
-
-        val baseRgb: Int = when (config.colorScheme) {
-            OverlayColorScheme.BLACK  -> 0x000000
-            OverlayColorScheme.NAVY  -> 0x1A237E
-            OverlayColorScheme.FOREST -> 0x1B5E20
-            OverlayColorScheme.MAROON -> 0x621B2F
-            OverlayColorScheme.CUSTOM -> config.customColorRgb.takeIf { it != 0 } ?: 0x000000
+    private fun applyCard(view: View, fill: Int, stroke: Int) {
+        view.background = GradientDrawable().apply { cornerRadius=16f*resources.displayMetrics.density; setColor(fill); setStroke((1f*resources.displayMetrics.density).toInt(),stroke) }
+    }
+    private fun styleTree(root: View, t: Tokens) {
+        if (root is TextView) {
+            root.setTextColor(when {
+                root.id == R.id.tv_site_title || root.id == R.id.tv_saved_summary || root.id == R.id.tv_info_summary || root.id == R.id.tv_camera_summary || root.id == R.id.tv_protection_summary -> t.accent
+                root.id == R.id.tv_site_status -> t.primary
+                root.text.toString().contains("REQUIRED") || root.text.toString().contains("OPTIONAL") -> t.accent
+                root.text.toString().contains("Managed") || root.text.toString().contains("Required") -> t.secondary
+                else -> t.primary
+            })
         }
-
-        val r = (baseRgb shr 16) and 0xFF
-        val g = (baseRgb shr 8)  and 0xFF
-        val b =  baseRgb         and 0xFF
-
-        val bgColor     = Color.argb(alphaInt, r, g, b)
-        val cornerPx    = 20f * resources.displayMetrics.density
-        val strokeColor = Color.argb(51, 255, 255, 255)
-        val strokePx    = (1f * resources.displayMetrics.density).toInt()
-
-        val drawable = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            setColor(bgColor)
-            cornerRadius = cornerPx
-            setStroke(strokePx, strokeColor)
-        }
-        binding.overlayPreviewCard.background = drawable
-        // Also update the alpha-section preview card (renamed to avoid duplicate ID)
-        binding.overlayPreviewCardAlpha.background = drawable.constantState?.newDrawable()?.mutate()
+        if (root is ViewGroup) for (i in 0 until root.childCount) styleTree(root.getChildAt(i), t)
     }
 
-    // ── Operator spinner ───────────────────────────────────────────────────────
-
-    private fun setupOperatorSpinner(datasetOps: List<String>) {
-        // Organization/operator selection will come from the verified sign-in profile.
-        // Until sign-in is connected, ALL keeps automatic GPS site matching available
-        // without allowing field users to rename or manually switch organizations.
-        val current = viewModel.stampConfig.value.selectedOperator
-        val assignedLabel = if (current == Operator.ALL) "Auto from site data" else current.displayName
-        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, listOf(assignedLabel))
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.spOperator.adapter = adapter
-        binding.spOperator.isEnabled = false
-        binding.spOperator.alpha = 0.72f
-    }
-
-    override fun onStart() {
-        super.onStart()
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.datasetOperators.collect { ops -> setupOperatorSpinner(ops) }
-        }
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
-    }
+    override fun onDestroyView() { super.onDestroyView(); _binding = null }
 }

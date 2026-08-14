@@ -12,7 +12,7 @@ import java.io.File
 import java.io.FileOutputStream
 
 /**
- * GeoStamp Enterprise Overlay Renderer — v11.1 "Enterprise Precision"
+ * GeoStamp Enterprise Overlay Renderer — v12 "Forensic Minimal"
  * Precise reproduction of the enterprise layout with custom vector icons.
  */
 object OverlayRenderer {
@@ -59,6 +59,8 @@ object OverlayRenderer {
         val cameraType: String = "Rear Camera",
         val overlayScale: Float = 1.0f,
         val savedOverlayHeightFraction: Float = 0.25f,
+        val savedStampLayout: SavedStampLayout = SavedStampLayout.CARD,
+        val stampTheme: StampTheme = StampTheme.DARK,
         val overlayX: Float = 0f,
         val overlayY: Float = 0f,
         val overlayW: Float = 0f,
@@ -69,7 +71,7 @@ object OverlayRenderer {
         val locationIntegrityRisk: Boolean = false,
         val verificationId: String = "",
         val verificationPayload: String = "",
-        val evidenceStatus: String = "VERIFIED"
+        val evidenceStatus: String = "CAPTURE SEALED"
     )
 
     fun render(source: Bitmap, data: OverlayData, context: Context): Bitmap {
@@ -80,7 +82,11 @@ object OverlayRenderer {
         val h = out.height.toFloat()
         val isPortrait = h > w
         
-        drawMasterBanner(canvas, data, w, h, isPortrait)
+        when (data.savedStampLayout) {
+            SavedStampLayout.CARD -> drawMasterBanner(canvas, data, w, h, isPortrait)
+            SavedStampLayout.STRIP -> drawStripBanner(canvas, data, w, h, isPortrait)
+            SavedStampLayout.FOOTER -> drawFooterBanner(canvas, data, w, h, isPortrait)
+        }
         if (data.locationIntegrityRisk) drawIntegrityMarker(canvas, w, h)
         return out
     }
@@ -129,121 +135,187 @@ object OverlayRenderer {
         }
     }
 
+    /**
+     * Permanent evidence stamp — v12 "Forensic Minimal".
+     *
+     * Design goals:
+     *  - Preserve the photograph (20–30% panel height).
+     *  - Make the four forensic questions immediately readable: WHERE / WHEN /
+     *    INTEGRITY / HOW TO VERIFY.
+     *  - Never truncate primary evidence fields such as coordinates or Evidence ID.
+     *  - Keep secondary telemetry (battery/network/weather/compass) out of the
+     *    permanent image. It remains available in the app/metadata where needed.
+     */
     private fun drawMasterBanner(cv: Canvas, data: OverlayData, w: Float, h: Float, isPortrait: Boolean) {
         val safeScale = data.overlayScale.coerceIn(0.8f, 1.2f)
         val r = ref(w, h) * safeScale
-
-        // Landscape safe scaling
         val landscapeScale = if (!isPortrait) 0.96f else 1f
 
         cv.save()
+        cv.scale(landscapeScale, landscapeScale, w / 2f, h / 2f)
 
-        cv.scale(
-            landscapeScale,
-            landscapeScale,
-            w / 2f,
-            h / 2f
-        )
         val margin = r * 0.025f
-        val radius = r * 0.015f
-
-        // Preserve the photograph: the saved evidence panel is always 20–30% of image height.
-        val requestedFraction = data.savedOverlayHeightFraction.coerceIn(0.20f, 0.30f)
-        val panelH = (h * requestedFraction).coerceIn(h * 0.20f, h * 0.30f)
+        val radius = r * 0.014f
+        val panelH = (h * data.savedOverlayHeightFraction.coerceIn(0.20f, 0.30f))
+            .coerceIn(h * 0.20f, h * 0.30f)
         val rect = RectF(margin, h - margin - panelH, w - margin, h - margin)
-        
-        val bgAlpha = (data.backgroundAlpha * 255).toInt().coerceIn(0, 255)
-        
-        // Premium Glassmorphism Background with Gradient
-        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = LinearGradient(0f, rect.top, 0f, rect.bottom,
-                intArrayOf(Color.argb(bgAlpha, 40, 40, 40), Color.argb(bgAlpha, 5, 5, 5)),
-                null, Shader.TileMode.CLAMP)
-        }
-        cv.drawRoundRect(rect, radius, radius, bgPaint)
-        
-        // Clean high-contrast border
-        cv.drawRoundRect(rect, radius, radius, strokePaint(Color.WHITE, r * 0.005f))
-        
-        val contentT = rect.top + r * 0.025f
-        val contentB = rect.bottom - r * 0.02f
-        val contentH = contentB - contentT
+        val alpha = (data.backgroundAlpha * 255).toInt().coerceIn(0, 255)
+        val light = data.stampTheme == StampTheme.LIGHT
+        val panelRgb = if (light) Color.rgb(255,255,255) else Color.rgb(8,12,18)
+        val primary = if (light) Color.rgb(11,24,48) else Color.WHITE
+        val secondary = if (light) Color.rgb(100,116,139) else Color.rgb(203,213,225)
+        val muted = if (light) Color.rgb(100,116,139) else Color.rgb(148,163,184)
+        val border = if (light) Color.argb(160,11,24,48) else Color.argb(220,255,255,255)
+        val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(alpha, Color.red(panelRgb), Color.green(panelRgb), Color.blue(panelRgb)) }
+        cv.drawRoundRect(rect, radius, radius, bg)
+        cv.drawRoundRect(rect, radius, radius, strokePaint(border, r * 0.0035f))
 
-        // 4-row layout: header + row1 + row2 + footer
-        val headerH = contentH * 0.19f
-        val row1H   = contentH * 0.32f
-        val row2H   = contentH * 0.31f   // extra height for 2-line status cells
-        val row3H   = contentH * 0.18f
+        val pad = r * 0.022f
+        val inner = RectF(rect.left + pad, rect.top + pad, rect.right - pad, rect.bottom - pad)
+        val headerH = inner.height() * 0.22f
+        val bodyH = inner.height() * 0.59f
+        val footerH = inner.height() * 0.19f
+        val bodyT = inner.top + headerH
+        val footerT = bodyT + bodyH
 
-        // Row 1 starts below the header + a thin gap for the separator
-        val row1T = contentT + headerH + r * 0.008f
+        // Header: operator identity | site | user.
+        drawHeader(cv, data, inner, inner.top, headerH, r)
+        cv.drawLine(inner.left, bodyT, inner.right, bodyT, dividerPaint(r))
 
-        // QR size fixed at r*0.19f for both orientations — decoupled from row heights
-        val qrSize = minOf(r * 0.155f, panelH * 0.64f)
-        val availableW = rect.width() - qrSize - r * 0.09f
+        // Body is split into an evidence block and an explicit verification block.
+        val qrBoxW = inner.width() * 0.245f
+        val evidenceRight = inner.right - qrBoxW - r * 0.018f
+        val evidenceW = evidenceRight - inner.left
+        val evidenceX = inner.left
 
-        // Split dateTimeLine: "Date|Day|Time"
         val parts = data.dateTimeLine.split("|")
-        val dateStr = parts.getOrNull(0) ?: ""
-        val dayStr = parts.getOrNull(1) ?: ""
-        val timeStr = parts.getOrNull(2) ?: ""
+        val dateStr = parts.getOrNull(0).orEmpty()
+        val dayStr = parts.getOrNull(1).orEmpty()
+        val timeStr = parts.getOrNull(2).orEmpty()
 
-        // ── HEADER ROW (Operator logo │ SITE ID │ User) ──────────────────
-        drawHeader(cv, data, rect, contentT, headerH, r)
-        cv.drawLine(rect.left + r * 0.02f, row1T - r * 0.006f,
-                    rect.right - r * 0.02f, row1T - r * 0.006f, dividerPaint(r))
-
-        // ── ROW 1 columns — 4 columns in both orientations (no altitude) ─
-        var curX = rect.left + r * 0.02f   // 0.02 so PIN icon (x+0.01) aligns with logo (x=r*0.03)
-        if (isPortrait) {
-            val w1 = availableW * 0.36f
-            val w2 = availableW * 0.22f
-            val w3 = availableW * 0.26f
-            val w4 = availableW * 0.16f
-            drawCol(cv, formatCoords(data.locationLine), data.addressLine, "PIN",    curX, row1T, w1, row1H, r); curX += w1; drawDiv(cv, curX, row1T, row1H, r)
-            drawCol(cv, timeStr, "",                                        "CLOCK",  curX, row1T, w2, row1H, r); curX += w2; drawDiv(cv, curX, row1T, row1H, r)
-            drawCol(cv, dateStr, dayStr,                                    "CAL",    curX, row1T, w3, row1H, r); curX += w3; drawDiv(cv, curX, row1T, row1H, r)
-            drawCol(cv, data.accuracyLine, "Accuracy",                      "TARGET", curX, row1T, w4, row1H, r)
-        } else {
-            val w1 = availableW * 0.33f   // slightly wider GPS col in landscape
-            val w2 = availableW * 0.22f
-            val w3 = availableW * 0.28f
-            val w4 = availableW * 0.17f
-            drawCol(cv, formatCoords(data.locationLine), data.addressLine, "PIN",    curX, row1T, w1, row1H, r); curX += w1; drawDiv(cv, curX, row1T, row1H, r)
-            drawCol(cv, timeStr, "",                                        "CLOCK",  curX, row1T, w2, row1H, r); curX += w2; drawDiv(cv, curX, row1T, row1H, r)
-            drawCol(cv, dateStr, dayStr,                                    "CAL",    curX, row1T, w3, row1H, r); curX += w3; drawDiv(cv, curX, row1T, row1H, r)
-            drawCol(cv, data.accuracyLine, "Accuracy",                      "TARGET", curX, row1T, w4, row1H, r)
+        val labelPaint = tp(r * 0.014f, muted, bold = true).apply {
+            letterSpacing = 0.10f
         }
-        
-        // ROW 2
-        val row2T = row1T + row1H + r * 0.01f
-        cv.drawLine(rect.left + r*0.02f, row2T, rect.right - qrSize - r*0.08f, row2T, dividerPaint(r))
-        
-        var r2X = rect.left + r * 0.02f
-        // Column widths sized to content — VERIFIED needs most space for the full ID text.
-        // Portrait has less horizontal room so VERIFIED gets a larger share (38%).
-        // Landscape has more room so other columns are a bit wider too.
-        val (vW, camW, gpsW, wthW, cmpW) = if (isPortrait) {
-            listOf(availableW*0.38f, availableW*0.18f, availableW*0.20f, availableW*0.13f, availableW*0.11f)
-        } else {
-            listOf(availableW*0.30f, availableW*0.20f, availableW*0.22f, availableW*0.15f, availableW*0.13f)
+        val coordPaint = tp(r * 0.026f, primary, bold = true).apply {
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+            setShadowLayer(0.6f, 0f, 0.5f, Color.BLACK)
+        }
+        val secondaryPaint = tp(r * 0.0145f, secondary)
+        val strongPaint = tp(r * 0.018f, primary, bold = true)
+        // WHERE
+        cv.drawText("LOCATION", evidenceX, bodyT + r * 0.035f - labelPaint.ascent(), labelPaint)
+        val coords = formatCoords(data.locationLine)
+        cv.drawText(coords, evidenceX, bodyT + r * 0.035f + r * 0.030f - coordPaint.ascent(), coordPaint)
+        if (data.addressLine.isNotBlank()) {
+            cv.drawText(singleLine(data.addressLine, evidenceW * 0.98f, secondaryPaint),
+                evidenceX, bodyT + r * 0.095f - secondaryPaint.ascent(), secondaryPaint)
         }
 
-        val statusColor = if (data.locationIntegrityRisk) Color.parseColor("#FF5252") else Color.parseColor("#2ECC71")
-        drawStatus(cv, "SHIELD", data.evidenceStatus, "ID: ${shortVerifyId(data)}", statusColor, r2X, row2T, vW, row2H, r); r2X += vW;   drawDiv(cv, r2X, row2T, row2H, r)
-        drawStatus(cv, "CAMERA",  data.cameraType,  "Camera",  Color.WHITE, r2X, row2T, camW, row2H, r); r2X += camW; drawDiv(cv, r2X, row2T, row2H, r)
-        drawStatus(cv, "LOCK",    if (data.locationIntegrityRisk) "Location Risk" else "GPS Accepted", if (data.locationIntegrityRisk) "Review" else "Recorded", if (data.locationIntegrityRisk) Color.parseColor("#FF5252") else Color.WHITE, r2X, row2T, gpsW, row2H, r); r2X += gpsW; drawDiv(cv, r2X, row2T, row2H, r)
-        drawStatus(cv, "WEATHER", data.weatherTemp,  data.weatherHaze, Color.WHITE, r2X, row2T, wthW, row2H, r); r2X += wthW; drawDiv(cv, r2X, row2T, row2H, r)
-        val dirParts = data.directionLine.split(" ")
-        drawStatus(cv, "COMPASS", dirParts.getOrNull(0) ?: "–", dirParts.getOrNull(1) ?: "", Color.WHITE, r2X, row2T, cmpW, row2H, r)
-        
-        // QR CODE — vertically centred across row1 + row2
-        drawQR(cv, data, rect.right - qrSize - r*0.025f, row1T + (row1H + row2H - qrSize) / 2f, qrSize)
-        
-        // FOOTER
-        drawFooter(cv, data, rect, contentB - row3H, row3H, r)
+        // WHEN + accuracy on one clean row.
+        val whenY = bodyT + bodyH * 0.50f
+        cv.drawLine(evidenceX, whenY - r * 0.018f, evidenceRight, whenY - r * 0.018f, dividerPaint(r))
+        val whenLeft = "${dateStr.ifBlank { "—" }} · ${timeStr.ifBlank { "—" }}"
+        cv.drawText(whenLeft, evidenceX, whenY + r * 0.010f - strongPaint.ascent(), strongPaint)
+        val accuracyPaint = tp(r * 0.015f,
+            if (data.locationIntegrityRisk) Color.rgb(248, 113, 113) else Color.rgb(134, 239, 172),
+            bold = true)
+        val accuracy = data.accuracyLine.ifBlank { "Accuracy unavailable" }
+        val accuracyW = accuracyPaint.measureText(accuracy)
+        cv.drawText(accuracy, evidenceRight - accuracyW, whenY + r * 0.010f - accuracyPaint.ascent(), accuracyPaint)
+        cv.drawText(if (dayStr.isBlank()) "" else dayStr,
+            evidenceX, whenY + r * 0.060f - secondaryPaint.ascent(), secondaryPaint)
+
+        // Integrity + Evidence ID.
+        val statusY = bodyT + bodyH * 0.68f
+        val statusColor = when {
+            data.locationIntegrityRisk -> Color.rgb(248, 113, 113)
+            data.evidenceStatus.contains("RISK", true) -> Color.rgb(248, 113, 113)
+            data.evidenceStatus.contains("WARNING", true) -> Color.rgb(251, 191, 36)
+            else -> Color.rgb(74, 222, 128)
+        }
+        val statusLabel = when {
+            data.locationIntegrityRisk -> "LOCATION RISK"
+            data.evidenceStatus.contains("WARNING", true) -> "LOCATION REVIEW"
+            else -> "CAPTURE SEALED"
+        }
+        val statusPaint = tp(r * 0.017f, statusColor, bold = true)
+        cv.drawText("✓  $statusLabel", evidenceX, statusY - statusPaint.ascent(), statusPaint)
+
+        val id = buildVerifyId(data)
+        val idPaint = tp(r * 0.0145f, if (light) Color.rgb(72, 55, 130) else Color.rgb(196, 181, 253), bold = true)
+        val idPrefix = "Evidence ID  "
+        val idText = idPrefix + id
+        cv.drawText(singleLine(idText, evidenceW * 0.98f, idPaint),
+            evidenceX, statusY + r * 0.045f - idPaint.ascent(), idPaint)
+
+        // Verification panel — deliberately explicit so the QR has meaning.
+        val qrPad = r * 0.010f
+        val qrRect = RectF(evidenceRight + r * 0.012f, bodyT + r * 0.015f,
+            inner.right, footerT - r * 0.015f)
+        cv.drawRoundRect(qrRect, r * 0.008f,
+            r * 0.008f, solidPaint(Color.argb(70, 255, 255, 255)))
+        cv.drawRoundRect(qrRect, r * 0.008f, r * 0.008f,
+            strokePaint(Color.argb(90, 255, 255, 255), r * 0.0015f))
+
+        val qrLabel = tp(r * 0.0125f, primary, bold = true)
+        qrLabel.textAlign = Paint.Align.CENTER
+        cv.drawText("SCAN TO VERIFY", qrRect.centerX(), qrRect.top + r * 0.025f - qrLabel.ascent(), qrLabel)
+        val qrSize = minOf(qrRect.width() - qrPad * 2f, qrRect.height() * 0.68f)
+        val qrY = qrRect.top + r * 0.055f
+        drawQR(cv, data, qrRect.centerX() - qrSize / 2f, qrY, qrSize)
+        val qrId = tp(r * 0.0115f, muted, bold = true)
+        qrId.textAlign = Paint.Align.CENTER
+        cv.drawText(shortVerifyId(data), qrRect.centerX(), qrRect.bottom - r * 0.018f - qrId.descent(), qrId)
+        qrLabel.textAlign = Paint.Align.LEFT
+        qrId.textAlign = Paint.Align.LEFT
+
+        // Footer: branding + permanent evidence ID. No battery/network in the saved image.
+        cv.drawLine(inner.left, footerT, inner.right, footerT, dividerPaint(r))
+        val footerPaint = tp(r * 0.0135f, secondary, bold = true)
+        val footerMuted = tp(r * 0.0115f, muted)
+        val footerY = footerT + footerH * 0.60f - (footerPaint.ascent() + footerPaint.descent()) / 2f
+        cv.drawText("GeoStamp  •  Axiom Infratech", inner.left, footerY, footerPaint)
+        val footerRight = "${data.cameraType}  •  ${data.operatorFullName.ifBlank { data.operatorLine }}"
+        val footerRightVisible = singleLine(footerRight, inner.width() * 0.52f, footerMuted)
+        val fw = footerMuted.measureText(footerRightVisible)
+        cv.drawText(footerRightVisible, inner.right - fw, footerY, footerMuted)
+
         cv.restore()
     }
+
+    private fun drawStripBanner(cv: Canvas, data: OverlayData, w: Float, h: Float, isPortrait: Boolean) {
+        val r = ref(w,h) * data.overlayScale.coerceIn(0.8f,1.2f)
+        val panelH = (h * 0.13f).coerceIn(h*0.10f,h*0.18f)
+        val y = h - panelH - r*0.018f
+        val light = data.stampTheme == StampTheme.LIGHT
+        val panel = if (light) Color.WHITE else Color.rgb(8,12,18)
+        val text = if (light) Color.rgb(11,24,48) else Color.WHITE
+        val sub = if (light) Color.rgb(100,116,139) else Color.rgb(203,213,225)
+        cv.drawRect(0f,y,w.toFloat(),h.toFloat(), solidPaint(Color.argb((data.backgroundAlpha*255).toInt(),Color.red(panel),Color.green(panel),Color.blue(panel))))
+        cv.drawLine(0f,y,w,y,strokePaint(if(light) Color.rgb(216,226,238) else Color.argb(160,255,255,255),r*0.002f))
+        val p = tp(r*0.018f,text,true); val s=tp(r*0.0125f,sub)
+        cv.drawText(formatCoords(data.locationLine),r*0.025f,y+r*0.045f-p.ascent(),p)
+        cv.drawText("${data.siteIdLine}  •  ${data.dateTimeLine.substringBefore('|')} ${data.dateTimeLine.substringAfter('|').substringAfter('|')}",r*0.025f,y+r*0.088f-s.ascent(),s)
+        val idp=tp(r*0.012f,if(light) Color.rgb(72,55,130) else Color.rgb(196,181,253),true)
+        val id=shortVerifyId(data)
+        cv.drawText(id,w-r*0.025f-idp.measureText(id),y+r*0.065f-idp.ascent(),idp)
+    }
+
+    private fun drawFooterBanner(cv: Canvas, data: OverlayData, w: Float, h: Float, isPortrait: Boolean) {
+        val r = ref(w,h) * data.overlayScale.coerceIn(0.8f,1.2f)
+        val panelH = (h * 0.075f).coerceIn(h*0.06f,h*0.10f)
+        val y = h - panelH
+        val light = data.stampTheme == StampTheme.LIGHT
+        val panel = if (light) Color.WHITE else Color.rgb(8,12,18)
+        val text = if (light) Color.rgb(11,24,48) else Color.WHITE
+        cv.drawRect(0f,y,w,h,solidPaint(Color.argb((data.backgroundAlpha*255).toInt(),Color.red(panel),Color.green(panel),Color.blue(panel))))
+        val p=tp(r*0.0125f,text,true)
+        val line="GeoStamp  •  ${data.siteIdLine}  •  ${shortVerifyId(data)}"
+        cv.drawText(singleLine(line,w-r*0.05f,p),r*0.025f,y+panelH*0.62f-(p.ascent()+p.descent())/2f,p)
+    }
+
+    private fun singleLine(text: String, maxW: Float, paint: TextPaint): String =
+        TextUtils.ellipsize(text.replace("\n", " "), paint, maxW.coerceAtLeast(1f), TextUtils.TruncateAt.END).toString()
 
     /**
      * Header row: [Operator logo] │ [SITE ID label / value] │ [Person icon / User label / username]
@@ -251,6 +323,9 @@ object OverlayRenderer {
      */
     private fun drawHeader(cv: Canvas, data: OverlayData, rect: RectF, y: Float, h: Float, r: Float) {
         val centerY = y + h / 2f
+        val light = data.stampTheme == StampTheme.LIGHT
+        val primary = if (light) Color.rgb(11,24,48) else Color.WHITE
+        val secondary = if (light) Color.rgb(100,116,139) else Color.LTGRAY
         val accent  = if (data.workspaceMode == "personal") Color.parseColor("#CE93D8") else accentColor(data.operatorLine)
         val totalW  = rect.width()
 
@@ -285,7 +360,7 @@ object OverlayRenderer {
 
         // ── MIDDLE: "SITE ID" label (top) + value (bottom), metrics-centered ─
         val siteX  = div1X + r * 0.025f
-        val labelP = tp(r * 0.017f, Color.LTGRAY)
+        val labelP = tp(r * 0.017f, secondary)
         val siteP  = tp(r * 0.031f, accent, bold = true)
         run {
             val blkH = (labelP.descent() - labelP.ascent()) + (siteP.descent() - siteP.ascent())
@@ -305,8 +380,8 @@ object OverlayRenderer {
         drawVectorIcon(cv, "PERSON", userX, centerY, iconSize, r, Color.LTGRAY)
 
         val userTextX  = userX + r * 0.062f
-        val userLabelP = tp(r * 0.017f, Color.LTGRAY)
-        val userNameP  = tp(r * 0.022f, Color.WHITE, bold = true)
+        val userLabelP = tp(r * 0.017f, secondary)
+        val userNameP  = tp(r * 0.022f, primary, bold = true)
         val maxNameW   = (rect.right - r * 0.02f - userTextX).coerceAtLeast(1f)
         run {
             val blkH = (userLabelP.descent() - userLabelP.ascent()) + (userNameP.descent() - userNameP.ascent())

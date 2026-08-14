@@ -86,12 +86,12 @@ object EvidenceTrustEngine {
         }
 
         val hash = record.optString("imageSha256", record.optString("sha256"))
-        if (hash.length >= 32) {
+        if (Regex("^[0-9a-fA-F]{64}$").matches(hash)) {
             score += 10
-            findings += "PASS · Image SHA-256 is available"
+            findings += "PASS · Image SHA-256 is structurally valid"
             timeline += "Image integrity hash recorded"
         } else {
-            findings += "LIMITED · Image hash is not publicly available"
+            findings += "LIMITED · Image SHA-256 is missing or malformed"
         }
 
         val markerVersion = record.optInt("markerVersion", record.optInt("v", 0))

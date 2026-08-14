@@ -3,20 +3,7 @@ package com.axiominfratech.geostamp.overlay
 import com.axiominfratech.geostamp.database.Operator
 
 enum class LiveInfoMode { FLOATING, BOTTOM, OFF }
-/**
- * The saved-photo renderer currently supports Card as the only user-selectable
- * saved stamp layout. STRIP/FOOTER aliases are retained only so older renderer
- * references remain source-compatible; both resolve to CARD.
- */
-enum class SavedStampLayout {
-    CARD;
-
-    companion object {
-        val STRIP: SavedStampLayout get() = CARD
-        val FOOTER: SavedStampLayout get() = CARD
-    }
-}
-
+enum class SavedStampLayout { CARD, STRIP, FOOTER }
 enum class StampTheme { DARK, LIGHT }
 
 enum class OverlayColorScheme(val label: String, val baseArgb: Int) {

@@ -2,16 +2,21 @@ package com.axiominfratech.geostamp.overlay
 
 import com.axiominfratech.geostamp.database.Operator
 
-/**
- * Overlay color scheme.
- * BLACK   = #66000000 (default glass dark)
- * NAVY    = #661A237E (deep indigo)
- * FOREST  = #661B5E20 (dark green)
- * MAROON  = #66621B2F (dark red)
- * CUSTOM  = user-picked ARGB via color picker
- */
 enum class LiveInfoMode { FLOATING, BOTTOM, OFF }
-enum class SavedStampLayout { CARD, STRIP, FOOTER }
+/**
+ * The saved-photo renderer currently supports Card as the only user-selectable
+ * saved stamp layout. STRIP/FOOTER aliases are retained only so older renderer
+ * references remain source-compatible; both resolve to CARD.
+ */
+enum class SavedStampLayout {
+    CARD;
+
+    companion object {
+        val STRIP: SavedStampLayout get() = CARD
+        val FOOTER: SavedStampLayout get() = CARD
+    }
+}
+
 enum class StampTheme { DARK, LIGHT }
 
 enum class OverlayColorScheme(val label: String, val baseArgb: Int) {
@@ -29,22 +34,14 @@ data class StampConfig(
     val blockIfSpoofDetected: Boolean = false,
     val overlayAlpha: Float = 0.6f,
     val overlayScale: Float = 1.0f,
-    /** Saved-photo overlay height as a fraction of the image; hard-limited to 20–30%. */
     val savedOverlayHeightFraction: Float = 0.25f,
     val savedStampLayout: SavedStampLayout = SavedStampLayout.CARD,
     val stampTheme: StampTheme = StampTheme.DARK,
-    /** Exactly one live camera information mode may be active. */
     val liveInfoMode: LiveInfoMode = LiveInfoMode.FLOATING,
-
-    // ── New in v4 ──────────────────────────────────────────────
-    /** Show/hide the floating main info card */
     @Deprecated("Use liveInfoMode")
     val showInfoCard: Boolean = true,
-    /** Show/hide the bottom info strip */
     @Deprecated("Use liveInfoMode")
     val showInfoStrip: Boolean = false,
-    /** Active color scheme for both overlays */
     val colorScheme: OverlayColorScheme = OverlayColorScheme.BLACK,
-    /** Custom color RGB (0xRRGGBB) used when colorScheme == CUSTOM */
     val customColorRgb: Int = 0x000000
 )

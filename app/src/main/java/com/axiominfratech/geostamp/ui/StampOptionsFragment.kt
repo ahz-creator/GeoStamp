@@ -1,14 +1,18 @@
 package com.axiominfratech.geostamp.ui
 
 import android.animation.LayoutTransition
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.StateListDrawable
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
+import android.widget.RadioButton
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
@@ -35,18 +39,23 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
     )
 
     private fun tokens(theme: StampTheme) = if (theme == StampTheme.LIGHT) Tokens(
-        Color.parseColor("#F5F8FC"), Color.WHITE, Color.parseColor("#D8E2EE"),
-        Color.parseColor("#0B1830"), Color.parseColor("#64748B"), Color.parseColor("#0AAFE6"), Color.WHITE
+        Color.parseColor("#07101F"), Color.parseColor("#111D2D"), Color.parseColor("#233651"),
+        Color.parseColor("#F5F7FA"), Color.parseColor("#A9B6C8"), Color.parseColor("#19A9DC"), Color.BLACK
     ) else Tokens(
         Color.parseColor("#07101F"), Color.parseColor("#111D2D"), Color.parseColor("#233651"),
-        Color.parseColor("#F5F7FA"), Color.parseColor("#A9B6C8"), Color.parseColor("#25C7DF"), Color.BLACK
+        Color.parseColor("#F5F7FA"), Color.parseColor("#A9B6C8"), Color.parseColor("#19A9DC"), Color.BLACK
     )
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         _binding = FragmentStampOptionsBinding.bind(view)
 
+        // The application shell stays dark. Stamp Theme never changes the app chrome.
+        binding.btnBack.imageTintList = ColorStateList.valueOf(
+            ContextCompat.getColor(requireContext(), R.color.text_primary)
+        )
         binding.btnBack.setOnClickListener { parentFragmentManager.popBackStack() }
+
         listOf(
             binding.sectionSiteHeader to Section.SITE,
             binding.sectionSavedHeader to Section.SAVED,
@@ -55,6 +64,10 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
             binding.sectionProtectionHeader to Section.PROTECTION
         ).forEach { (header, section) -> header.setOnClickListener { setOpenSection(section, true) } }
         binding.sectionSavedContent.post { setOpenSection(Section.SAVED, false) }
+
+        renameStampThemeLabel()
+        setupConnectedSavedAccordion()
+        setupAutoSaveInset()
 
         binding.groupLayout.setOnCheckedChangeListener { _, id -> if (!applyingState) when (id) {
             R.id.radio_layout_card -> viewModel.updateSavedStampLayout(SavedStampLayout.CARD)
@@ -97,6 +110,62 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
         }
     }
 
+    private fun renameStampThemeLabel() {
+        fun walk(v: View) {
+            if (v is TextView && v.text.toString().trim().equals("Theme", ignoreCase = true)) {
+                v.text = "STAMP THEME"
+            }
+            if (v is ViewGroup) for (i in 0 until v.childCount) walk(v.getChildAt(i))
+        }
+        walk(binding.sectionSavedContent)
+    }
+
+    private fun setupConnectedSavedAccordion() {
+        binding.sectionSavedHeader.layoutParams = binding.sectionSavedHeader.layoutParams.apply {
+            if (this is ViewGroup.MarginLayoutParams) bottomMargin = 0
+        }
+        binding.sectionSavedContent.layoutParams = binding.sectionSavedContent.layoutParams.apply {
+            if (this is ViewGroup.MarginLayoutParams) topMargin = 0
+        }
+        binding.sectionSavedContent.setPadding(
+            binding.sectionSavedContent.paddingLeft,
+            binding.sectionSavedContent.paddingTop,
+            binding.sectionSavedContent.paddingRight,
+            binding.sectionSavedContent.paddingBottom
+        )
+    }
+
+    private fun setupAutoSaveInset() {
+        val scroll = binding.settingsScroll
+        val content = scroll.getChildAt(0) as? ViewGroup ?: return
+        val autoSave = binding.tvAutoSave
+
+        // Keep the save notice inside the scrollable content so it can never float over
+        // the preview or the last accordion.
+        if (autoSave.parent !== content) {
+            (autoSave.parent as? ViewGroup)?.removeView(autoSave)
+            content.addView(autoSave)
+        }
+
+        autoSave.layoutParams = android.widget.LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = 16.dpToPx()
+            bottomMargin = 16.dpToPx()
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(scroll) { _, insets ->
+            val navBottom = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+            scroll.setPadding(scroll.paddingLeft, scroll.paddingTop, scroll.paddingRight, navBottom)
+            autoSave.layoutParams = autoSave.layoutParams.apply {
+                if (this is ViewGroup.MarginLayoutParams) bottomMargin = navBottom + 16.dpToPx()
+            }
+            insets
+        }
+        ViewCompat.requestApplyInsets(scroll)
+    }
+
     private fun setOpenSection(section: Section, animate: Boolean) {
         openSection = section
         val pairs = listOf(
@@ -129,8 +198,9 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
     private fun applyState(config: com.axiominfratech.geostamp.overlay.StampConfig) {
         applyingState = true
         try {
-            val t = tokens(config.stampTheme)
-            applyTokens(t)
+            val shell = tokens(StampTheme.DARK)
+            applyTokens(shell)
+            applySegmentTheme(config.stampTheme)
 
             val radius = viewModel.remoteAppConfig.value.policy.siteDetectionRadiusM
             val radiusLabel = if (radius >= 1000) "${(radius / 1000).let { if (it % 1.0 == 0.0) it.toInt() else String.format("%.1f", it) }} km" else "${radius.toInt()} m"
@@ -169,7 +239,7 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
             binding.tvProtectionManaged.text = "Available for this device/session"
 
             binding.tvSavedSummary.text = "${layoutLabel(config.savedStampLayout)} · ${sizeLabel(nearest)} · ${alphaPercent.toInt()}% · ${if (config.stampTheme == StampTheme.DARK) "Dark" else "Light"}"
-            refreshPreview(config, t)
+            refreshPreview(config, config.stampTheme)
         } finally { applyingState = false }
     }
 
@@ -177,51 +247,153 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
     private fun sizeLabel(v: Int) = when(v) {20->"Compact";30->"Large";else->"Standard"}
     private fun layoutLabel(v: SavedStampLayout) = when(v) { SavedStampLayout.CARD->"Card"; SavedStampLayout.STRIP->"Strip"; SavedStampLayout.FOOTER->"Footer" }
 
-    private fun refreshPreview(config: com.axiominfratech.geostamp.overlay.StampConfig, t: Tokens) {
-        binding.previewFrame.setBackgroundColor(t.preview)
-        val lp = binding.overlayPreviewCard.layoutParams
-        when (config.savedStampLayout) {
-            SavedStampLayout.CARD -> { lp.height = (150 * resources.displayMetrics.density).toInt().coerceAtLeast(1); binding.overlayPreviewCard.layoutParams = lp; binding.overlayPreviewCard.setPadding(12,12,12,12); binding.overlayPreviewCard.gravity = android.view.Gravity.NO_GRAVITY }
-            SavedStampLayout.STRIP -> { lp.height = (92 * resources.displayMetrics.density).toInt(); binding.overlayPreviewCard.layoutParams = lp; binding.overlayPreviewCard.setPadding(12,8,12,8); binding.overlayPreviewCard.gravity = android.view.Gravity.CENTER_VERTICAL }
-            SavedStampLayout.FOOTER -> { lp.height = (58 * resources.displayMetrics.density).toInt(); binding.overlayPreviewCard.layoutParams = lp; binding.overlayPreviewCard.setPadding(12,6,12,6); binding.overlayPreviewCard.gravity = android.view.Gravity.CENTER_VERTICAL }
+    private fun refreshPreview(config: com.axiominfratech.geostamp.overlay.StampConfig, theme: StampTheme) {
+        val light = theme == StampTheme.LIGHT
+        val primary = if (light) Color.parseColor("#0B1830") else Color.WHITE
+        val secondary = if (light) Color.parseColor("#64748B") else Color.parseColor("#CBD5E1")
+        val divider = if (light) Color.parseColor("#CBD5E1") else Color.parseColor("#233651")
+        val border = if (light) Color.parseColor("#CBD7E5") else Color.parseColor("#233651")
+        val previewBg = Color.BLACK
+        val density = resources.displayMetrics.density
+
+        val frameHeightDp = when (config.savedStampLayout) {
+            SavedStampLayout.CARD -> 250
+            SavedStampLayout.STRIP -> 175
+            SavedStampLayout.FOOTER -> 135
         }
+        val stampHeightDp = when (config.savedStampLayout) {
+            SavedStampLayout.CARD -> 180
+            SavedStampLayout.STRIP -> 92
+            SavedStampLayout.FOOTER -> 60
+        }
+        binding.previewFrame.layoutParams = binding.previewFrame.layoutParams.apply {
+            height = (frameHeightDp * density).toInt()
+        }
+        binding.previewFrame.setBackgroundColor(previewBg)
+
+        binding.overlayPreviewCard.layoutParams = binding.overlayPreviewCard.layoutParams.apply {
+            height = (stampHeightDp * density).toInt()
+        }
+        binding.overlayPreviewCard.setPadding(
+            (12 * density).toInt(),
+            (10 * density).toInt(),
+            (12 * density).toInt(),
+            (10 * density).toInt()
+        )
+
         val bg = GradientDrawable().apply {
-            cornerRadius = 16f * resources.displayMetrics.density
-            val a = (config.overlayAlpha * 255).toInt().coerceIn(50,230)
-            setColor(Color.argb(a, Color.red(t.card), Color.green(t.card), Color.blue(t.card)))
-            setStroke((1f * resources.displayMetrics.density).toInt(), t.border)
+            cornerRadius = 16f * density
+            val a = (config.overlayAlpha * 255).toInt().coerceIn(50, 230)
+            val surface = if (light) Color.WHITE else Color.rgb(8, 12, 18)
+            setColor(Color.argb(a, Color.red(surface), Color.green(surface), Color.blue(surface)))
+            setStroke((1f * density).toInt().coerceAtLeast(1), border)
         }
         binding.overlayPreviewCard.background = bg
-        val text = if (config.stampTheme == StampTheme.LIGHT) Color.parseColor("#0B1830") else Color.WHITE
-        val secondary = if (config.stampTheme == StampTheme.LIGHT) Color.parseColor("#64748B") else Color.parseColor("#A9B6C8")
-        binding.previewStatus.setTextColor(Color.rgb(34,197,94))
-        binding.previewCoords.setTextColor(text)
+
+        binding.previewStatus.setTextColor(Color.rgb(34, 197, 94))
+        binding.previewCoords.setTextColor(primary)
         binding.previewTime.setTextColor(secondary)
-        binding.previewSite.setTextColor(secondary)
+        binding.previewSite.setTextColor(Color.parseColor("#8B5CF6"))
         binding.previewStatus.text = "✓ Location verified"
         binding.previewCoords.text = "24.8610° N, 67.0101° E"
         binding.previewTime.text = "02 May 2026, 14:30"
         binding.previewSite.text = "Site ID: PKZ-KHI-001"
+
+        // Keep the preview visually faithful to the selected stamp theme.
+        binding.overlayPreviewCard.contentDescription = "${theme.name} stamp preview; divider ${String.format("#%06X", 0xFFFFFF and divider)}"
     }
 
     private fun applyTokens(t: Tokens) {
-        binding.stampSettingsRoot.setBackgroundColor(t.page)
-        binding.tvTitle.setTextColor(t.primary)
-        binding.tvSubtitle.setTextColor(t.accent)
-        binding.tvAutoSave.setTextColor(t.secondary)
+        // These tokens are deliberately fixed to the existing dark application shell.
+        // Stamp Theme is NOT an application appearance switch.
+        binding.stampSettingsRoot.setBackgroundColor(Color.parseColor("#07101F"))
+        binding.tvTitle.setTextColor(Color.parseColor("#F5F7FA"))
+        binding.tvSubtitle.setTextColor(Color.parseColor("#A9B6C8"))
+        binding.tvAutoSave.setTextColor(Color.parseColor("#A9B6C8"))
+
         val headers = listOf(binding.sectionSiteHeader,binding.sectionSavedHeader,binding.sectionInfoHeader,binding.sectionCameraHeader,binding.sectionProtectionHeader)
         val contents = listOf(binding.sectionSiteContent,binding.sectionSavedContent,binding.sectionInfoContent,binding.sectionCameraContent,binding.sectionProtectionContent)
         headers.forEach { applyCard(it,t.card,t.border); styleTree(it,t) }
         contents.forEach { applyCard(it,t.card,t.border); styleTree(it,t) }
-        binding.previewFrame.setBackgroundColor(t.preview)
-        ViewCompat.getWindowInsetsController(requireView())?.isAppearanceLightStatusBars = t == tokens(StampTheme.LIGHT)
-        requireActivity().window.statusBarColor = t.page
-        requireActivity().window.navigationBarColor = t.page
+
+        // Saved Photo Stamp is one connected rounded accordion.
+        connectAccordion(binding.sectionSavedHeader, binding.sectionSavedContent, t.card, t.border)
+    }
+
+    private fun applySegmentTheme(theme: StampTheme) {
+        val light = theme == StampTheme.LIGHT
+        val selectedBg = Color.parseColor("#19A9DC")
+        val selectedText = Color.parseColor("#07182B")
+        val unselectedBg = Color.parseColor(if (light) "#F4F7FA" else "#0B1424")
+        val unselectedText = Color.parseColor(if (light) "#0B1830" else "#A9B6C8")
+        val border = Color.parseColor(if (light) "#CBD7E5" else "#233651")
+
+        val groups = listOf(binding.groupLayout, binding.groupSize, binding.groupTheme, binding.groupLiveInfo)
+        groups.forEach { group ->
+            for (i in 0 until group.childCount) {
+                val button = group.getChildAt(i) as? RadioButton ?: continue
+                val radius = 5f * resources.displayMetrics.density
+                val checked = GradientDrawable().apply {
+                    cornerRadius = radius
+                    setColor(selectedBg)
+                    setStroke((1f * resources.displayMetrics.density).toInt().coerceAtLeast(1), selectedBg)
+                }
+                val normal = GradientDrawable().apply {
+                    cornerRadius = radius
+                    setColor(unselectedBg)
+                    setStroke((1f * resources.displayMetrics.density).toInt().coerceAtLeast(1), border)
+                }
+                button.background = StateListDrawable().apply {
+                    addState(intArrayOf(android.R.attr.state_checked), checked)
+                    addState(intArrayOf(), normal)
+                }
+                button.setTextColor(ColorStateList(
+                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                    intArrayOf(selectedText, unselectedText)
+                ))
+                button.buttonTintList = null
+            }
+        }
+    }
+
+    private fun connectAccordion(header: View, content: View, fill: Int, stroke: Int) {
+        val density = resources.displayMetrics.density
+        val r = 16f * density
+        val zero = 0f
+        val topCorners = floatArrayOf(r,r,r,r,zero,zero,zero,zero)
+        val bottomCorners = floatArrayOf(zero,zero,zero,zero,r,r,r,r)
+        header.background = GradientDrawable().apply {
+            cornerRadii = topCorners
+            setColor(fill)
+            setStroke((1f * density).toInt().coerceAtLeast(1), stroke)
+        }
+        content.background = GradientDrawable().apply {
+            cornerRadii = bottomCorners
+            setColor(fill)
+            setStroke((1f * density).toInt().coerceAtLeast(1), stroke)
+        }
+        header.layoutParams = header.layoutParams.apply {
+            if (this is ViewGroup.MarginLayoutParams) {
+                topMargin = 8.dpToPx()
+                bottomMargin = 0
+            }
+        }
+        content.layoutParams = content.layoutParams.apply {
+            if (this is ViewGroup.MarginLayoutParams) {
+                topMargin = 0
+                bottomMargin = 0
+            }
+        }
     }
 
     private fun applyCard(view: View, fill: Int, stroke: Int) {
-        view.background = GradientDrawable().apply { cornerRadius=16f*resources.displayMetrics.density; setColor(fill); setStroke((1f*resources.displayMetrics.density).toInt(),stroke) }
+        view.background = GradientDrawable().apply {
+            cornerRadius=16f*resources.displayMetrics.density
+            setColor(fill)
+            setStroke((1f*resources.displayMetrics.density).toInt().coerceAtLeast(1),stroke)
+        }
     }
+
     private fun styleTree(root: View, t: Tokens) {
         if (root is TextView) {
             root.setTextColor(when {
@@ -234,6 +406,8 @@ class StampOptionsFragment : Fragment(R.layout.fragment_stamp_options) {
         }
         if (root is ViewGroup) for (i in 0 until root.childCount) styleTree(root.getChildAt(i), t)
     }
+
+    private fun Int.dpToPx() = (this * resources.displayMetrics.density).toInt()
 
     override fun onDestroyView() { super.onDestroyView(); _binding = null }
 }
